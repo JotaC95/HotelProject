@@ -59,7 +59,7 @@ const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
 };
 
 export default function RoomListScreen() {
-    const { rooms, settings, session, systemIncidents, addSystemIncident } = useHotel();
+    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession } = useHotel();
     const { user } = useAuth();
     const navigation = useNavigation<NavigationProp>();
 
@@ -99,6 +99,27 @@ export default function RoomListScreen() {
             ]
         );
     };
+
+    // --- Timer Completion Logic ---
+    useEffect(() => {
+        if (isCleaner && allRoomsCompleted && session.isActive && session.startTime) {
+            // Calculate timing
+            const start = new Date(session.startTime).getTime();
+            const now = new Date().getTime();
+            const elapsedMinutes = (now - start) / 1000 / 60;
+            const target = session.totalMinutes || 1;
+
+            completeSession(); // Stop the timer on backend
+
+            if (elapsedMinutes <= target) {
+                Alert.alert("🎉 Great Job!", "You finished on time! Keep up the good work.");
+            } else {
+                const delay = Math.round(elapsedMinutes - target);
+                Alert.alert("⚠️ Delayed", `Finished ${delay} minutes late. Supervisor has been notified.`);
+                addSystemIncident(`Team ${user?.groupId} finished ${delay} mins late.`, 'SUPERVISOR');
+            }
+        }
+    }, [allRoomsCompleted, session.isActive, isCleaner]);
 
     // --- Supervisor Alert Logic ---
     const helpOffers = useMemo(() => {

@@ -1,21 +1,33 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
 
-const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8000/api' : 'http://localhost:8000/api';
+const BASE_URL = 'https://c16b1706915e.ngrok-free.app/api';
 
 const api = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true'
+  },
 });
 
-export const setAuthToken = (token: string | null) => {
-    if (token) {
-        api.defaults.headers.common['Authorization'] = `Token ${token}`;
-    } else {
-        delete api.defaults.headers.common['Authorization'];
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.log('API Error:', error.message);
+    if (error.response) {
+      console.log('Status:', error.response.status);
+      console.log('Data:', error.response.data);
     }
+    return Promise.reject(error);
+  }
+);
+
+export const setAuthToken = (token: string | null) => {
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Token ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
 };
 
 export default api;

@@ -79,9 +79,11 @@ export interface HotelSettings {
 }
 
 export interface Session {
+    id: string | null;
     startTime: string | null;
     endTime: string | null;
     isActive: boolean;
+    totalMinutes: number;
 }
 
 export const INCIDENT_PRESETS = [
@@ -102,6 +104,9 @@ interface HotelContextType {
     logs: LogEntry[];
     settings: HotelSettings;
     session: Session;
+    startSession: (groupId: string) => Promise<void>;
+    completeSession: () => Promise<void>;
+    checkSession: () => Promise<void>;
     updateSettings: (newSettings: HotelSettings) => void;
     updateRoomStatus: (id: string, status: RoomStatus) => void;
     toggleDND: (id: string) => void;
@@ -184,8 +189,57 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [systemIncidents, setSystemIncidents] = useState<Incident[]>([]); // Phase 26
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [settings, setSettings] = useState<HotelSettings>(DEFAULT_SETTINGS);
-    const [session, setSession] = useState<Session>({ startTime: null, endTime: null, isActive: false });
+    const [session, setSession] = useState<Session>({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0 });
     const { user } = useAuth();
+
+    const checkSession = async () => {
+        if (!user?.groupId) return;
+        try {
+            const res = await api.get(`/housekeeping/cleaning-sessions/current/?group_id=${user.groupId}`);
+            if (res.data) { // Active session found
+                setSession({
+                    id: res.data.id,
+                    startTime: res.data.start_time,
+                    endTime: null,
+                    isActive: true,
+                    totalMinutes: res.data.target_duration_minutes
+                });
+            } else {
+                setSession({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0 });
+            }
+        } catch (e) {
+            console.error("Check session failed", e);
+        }
+    };
+
+    const startSession = async (groupId: string) => {
+        try {
+            const res = await api.post('/housekeeping/cleaning-sessions/', { group_id: groupId });
+            setSession({
+                id: res.data.id,
+                startTime: res.data.start_time,
+                endTime: null,
+                isActive: true,
+                totalMinutes: res.data.target_duration_minutes
+            });
+            fetchRooms(); // Refresh rooms to ensure consistent state
+        } catch (e) {
+            console.error("Start session failed", e);
+        }
+    };
+
+    const completeSession = async () => {
+        if (!session.id) return;
+        try {
+            await api.patch(`/housekeeping/cleaning-sessions/${session.id}/`, {
+                status: 'COMPLETED',
+                end_time: new Date().toISOString()
+            });
+            setSession(prev => ({ ...prev, isActive: false, endTime: new Date().toISOString() }));
+        } catch (e) {
+            console.error("Complete session failed", e);
+        }
+    };
 
     // Fetch rooms from API
     const fetchRooms = async () => {
@@ -244,7 +298,11 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         if (user) {
             fetchRooms();
-            const interval = setInterval(fetchRooms, 10000); // Polling for updates
+            checkSession();
+            const interval = setInterval(() => {
+                fetchRooms();
+                checkSession(); // Keep session synced
+            }, 10000); // Polling for updates
             return () => clearInterval(interval);
         } else {
             setRooms([]); // Clear rooms on logout
@@ -266,6 +324,11 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const updateRoomStatus = async (id: string, status: RoomStatus) => {
+        // Auto-Start Session for Cleaners
+        if (status === 'IN_PROGRESS' && !session.isActive && user?.role === 'CLEANER' && user.groupId) {
+            startSession(user.groupId);
+        }
+
         // Optimistic Update
         setRooms(prev => prev.map(room =>
             room.id === id ? { ...room, status, lastUpdated: new Date().toISOString() } : room
@@ -692,6 +755,7 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return (
         <HotelContext.Provider value={{
             rooms, logs, settings, session,
+            startSession, completeSession, checkSession,
             updateSettings, updateRoomStatus, addIncident, resolveIncident,
             toggleDND, toggleExtraTime, setPriority, updateNotes, updateGuestStatus,
             startMaintenance, getStats, exportData,

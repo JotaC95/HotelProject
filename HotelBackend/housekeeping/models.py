@@ -94,3 +94,15 @@ class InventoryItem(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.quantity})"
+
+class CleaningSession(models.Model):
+    STATUS_CHOICES = (('IN_PROGRESS', 'In Progress'), ('COMPLETED', 'Completed'), ('OVERTIME', 'Overtime'))
+    
+    group_id = models.CharField(max_length=50) # The team ID
+    start_time = models.DateTimeField(auto_now_add=True)
+    target_duration_minutes = models.IntegerField(default=0)
+    end_time = models.DateTimeField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='IN_PROGRESS')
+    
+    def __str__(self):
+        return f"Session {self.group_id} - {self.status}"

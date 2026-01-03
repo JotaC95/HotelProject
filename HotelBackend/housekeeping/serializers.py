@@ -27,3 +27,9 @@ class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = '__all__'
+
+class CleaningSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import CleaningSession
+        model = CleaningSession
+        fields = '__all__'

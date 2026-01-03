@@ -35,7 +35,7 @@ export interface InventoryItem {
     last_updated: string;
 }
 
-export type CleaningType = 'DEPARTURE' | 'STAYOVER' | 'WEEKLY' | 'DAYUSE' | 'HOLDOVER' | 'PREARRIVAL' | 'RUBBISH';
+export type CleaningType = 'DEPARTURE' | 'PREARRIVAL' | 'WEEKLY' | 'HOLDOVER' | 'RUBBISH' | 'DAYUSE' | 'STAYOVER';
 
 export type GuestStatus = 'IN_ROOM' | 'OUT';
 
@@ -116,6 +116,7 @@ interface HotelContextType {
     updateGuestStatus: (id: string, status: GuestStatus, keysFound?: boolean) => void;
     startMaintenance: (id: string, reason: string) => void; // Phase 20
     resolveIncident: (roomId: string, incidentId: string) => void;
+    updateRoomDetails: (id: string, updates: Partial<Room>) => Promise<void>;
     addIncident: (id: string, text: string, reporter: string, targetRole: IncidentRole, group?: string, photoUri?: string) => void;
     getStats: () => { pending: number; inProgress: number; inspection: number; completed: number };
     exportData: () => object;
@@ -163,7 +164,7 @@ export interface CleaningTypeDefinition {
 const HotelContext = createContext<HotelContextType | undefined>(undefined);
 
 const TYPES: ('Single' | 'Double' | 'Suite')[] = ['Single', 'Double', 'Suite'];
-const CLEANING_TYPES: CleaningType[] = ['DEPARTURE', 'STAYOVER', 'WEEKLY', 'PREARRIVAL', 'RUBBISH']; // Commonly used in mock
+const CLEANING_TYPES: CleaningType[] = ['DEPARTURE', 'PREARRIVAL', 'WEEKLY', 'HOLDOVER', 'RUBBISH', 'DAYUSE'];
 const GUEST_STATUSES: GuestStatus[] = ['IN_ROOM', 'OUT'];
 
 // MOCK_ROOMS Removed
@@ -172,12 +173,12 @@ const MOCK_ROOMS: Room[] = [];
 const DEFAULT_SETTINGS: HotelSettings = {
     timeEstimates: {
         DEPARTURE: 30,
-        STAYOVER: 20,
-        WEEKLY: 45,
-        DAYUSE: 15,
-        HOLDOVER: 10,
         PREARRIVAL: 60,
-        RUBBISH: 5
+        WEEKLY: 45,
+        HOLDOVER: 10,
+        RUBBISH: 5,
+        DAYUSE: 15,
+        STAYOVER: 20 // Kept for backward compat if needed, but not in active list
     }
 };
 
@@ -400,6 +401,27 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (e) {
             console.error("Failed to resolve incident", e);
             fetchRooms();
+        }
+    };
+
+    const updateRoomDetails = async (id: string, updates: Partial<Room>) => {
+        // Optimistic
+        setRooms(prev => prev.map(room => room.id === id ? { ...room, ...updates } : room));
+
+        try {
+            // Map frontend keys to backend keys
+            const payload: any = {};
+            if (updates.cleaningType) payload.cleaning_type = updates.cleaningType;
+            if (updates.guestDetails?.currentGuest !== undefined) payload.current_guest_name = updates.guestDetails.currentGuest;
+            if (updates.guestDetails?.nextGuest !== undefined) payload.next_guest_name = updates.guestDetails.nextGuest;
+
+            await api.patch(`/housekeeping/rooms/${id}/`, payload);
+            addLog(`Room details updated for ${id}`, 'NOTE');
+            fetchRooms(); // Refresh to ensure sync
+        } catch (e: any) {
+            console.error("Failed to update room details", e);
+            Alert.alert("Error", e.response?.data ? JSON.stringify(e.response.data) : "Failed to update details");
+            fetchRooms(); // Revert
         }
     };
 
@@ -756,7 +778,7 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         <HotelContext.Provider value={{
             rooms, logs, settings, session,
             startSession, completeSession, checkSession,
-            updateSettings, updateRoomStatus, addIncident, resolveIncident,
+            updateSettings, updateRoomStatus, addIncident, resolveIncident, updateRoomDetails,
             toggleDND, toggleExtraTime, setPriority, updateNotes, updateGuestStatus,
             startMaintenance, getStats, exportData,
             staff, fetchStaff, updateStaffGroup, createRoom, assignRoomToGroup,

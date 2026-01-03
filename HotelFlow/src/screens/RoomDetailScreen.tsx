@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, TextInput, Alert, KeyboardAvoidingView, Platform, LayoutAnimation } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, TextInput, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RoomStackParamList } from '../AppNavigator';
-import { useHotel, Room, RoomStatus, INCIDENT_PRESETS, IncidentRole } from '../contexts/HotelContext'; // Imported presets
+import { useHotel, Room, RoomStatus, INCIDENT_PRESETS, IncidentRole, CleaningType } from '../contexts/HotelContext'; // Imported presets
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
-import { Circle, CheckCircle2, AlertTriangle, Moon, Clock, Save, Plus, Play, User, LogOut, LogIn, Languages, Camera, DoorOpen, Bed, Package, Key, Phone, Wrench, UserCheck } from 'lucide-react-native';
+import { Circle, CheckCircle2, AlertTriangle, Moon, Clock, Save, Plus, Play, User, LogOut, LogIn, Languages, Camera, DoorOpen, Bed, Package, Key, Phone, Wrench, UserCheck, Edit2, X, ChevronDown, Check } from 'lucide-react-native';
 import { StatusBadge } from '../components/StatusBadge';
 import { Image } from 'react-native';
 
@@ -15,7 +15,7 @@ export default function RoomDetailScreen() {
     const route = useRoute<RoomDetailRouteProp>();
     const navigation = useNavigation();
     const { roomId } = route.params;
-    const { rooms, updateRoomStatus, toggleDND, toggleExtraTime, updateNotes, addIncident, updateGuestStatus, resolveIncident } = useHotel();
+    const { rooms, updateRoomStatus, toggleDND, toggleExtraTime, updateNotes, addIncident, updateGuestStatus, resolveIncident, updateRoomDetails, cleaningTypes } = useHotel();
     const { user } = useAuth();
 
     const room = rooms.find(r => r.id === roomId);
@@ -26,9 +26,36 @@ export default function RoomDetailScreen() {
     const [isTranslating, setIsTranslating] = useState(false); // Mock
     const [attachedPhoto, setAttachedPhoto] = useState<string | null>(null);
 
+    // Edit Mode State
+    const [isEditing, setIsEditing] = useState(false);
+    const [tempCleaningType, setTempCleaningType] = useState<CleaningType>(room?.cleaningType || 'DEPARTURE');
+    const [tempCurrentGuest, setTempCurrentGuest] = useState(room?.guestDetails?.currentGuest || '');
+    const [tempNextGuest, setTempNextGuest] = useState(room?.guestDetails?.nextGuest || '');
+    const [showTypePicker, setShowTypePicker] = useState(false);
+
     useEffect(() => {
-        if (room) setNotes(room.notes);
-    }, [room]);
+        if (room) {
+            setNotes(room.notes);
+            if (!isEditing) {
+                setTempCleaningType(room.cleaningType);
+                setTempCurrentGuest(room.guestDetails?.currentGuest || '');
+                setTempNextGuest(room.guestDetails?.nextGuest || '');
+            }
+        }
+    }, [room, isEditing]);
+
+    const handleSaveDetails = async () => {
+        if (!room) return;
+        await updateRoomDetails(room.id, {
+            cleaningType: tempCleaningType,
+            guestDetails: {
+                ...room.guestDetails,
+                currentGuest: tempCurrentGuest,
+                nextGuest: tempNextGuest
+            }
+        });
+        setIsEditing(false);
+    };
 
     if (!room) return <View><Text>Room not found</Text></View>;
 
@@ -133,10 +160,39 @@ export default function RoomDetailScreen() {
             <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
                 {/* Header Card */}
                 <View style={styles.headerCard}>
-                    <Text style={styles.roomBigNumber}>{room.number}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 10 }}>
+                        <Text style={styles.roomBigNumber}>{room.number}</Text>
+                        {(user?.role === 'SUPERVISOR' || user?.role === 'RECEPTION') && (
+                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={{ padding: 8 }}>
+                                {isEditing ? <X color={theme.colors.text} /> : <Edit2 color={theme.colors.textSecondary} />}
+                            </TouchableOpacity>
+                        )}
+                    </View>
                     <Text style={styles.roomType}>{room.type} • Floor {room.floor}</Text>
-                    <StatusBadge status={room.status} />
+
+                    {isEditing ? (
+                        <TouchableOpacity
+                            style={styles.cleaningTypeSelector}
+                            onPress={() => setShowTypePicker(true)}
+                        >
+                            <Text style={styles.cleaningTypeSelectorText}>{tempCleaningType}</Text>
+                            <ChevronDown size={16} color={theme.colors.text} />
+                        </TouchableOpacity>
+                    ) : (
+                        <StatusBadge status={room.status} />
+                    )}
+                    {/* Hack: Show status badge below type in edit mode too if needed, or replace it. Currently replacing status badge with type selector in edit mode for focus */}
                 </View>
+
+                {/* Edit Mode Save Action */}
+                {isEditing && (
+                    <View style={styles.section}>
+                        <TouchableOpacity style={styles.saveDetailsButton} onPress={handleSaveDetails}>
+                            <Save size={18} color="white" />
+                            <Text style={styles.saveDetailsText}>Save Details</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Room Setup (Phase 6) */}
                 <View style={styles.section}>
@@ -171,39 +227,71 @@ export default function RoomDetailScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Guest Information</Text>
 
-                    <View style={styles.guestRow}>
-                        <View style={styles.guestInfoItem}>
-                            <User size={20} color={room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success} />
-                            <Text style={[
-                                styles.guestStatusText,
-                                { color: room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success }
-                            ]}>
-                                {room.guestStatus === 'IN_ROOM' ? 'Guest in Room' : 'Room Empty'}
-                            </Text>
-                            {room.keysFound !== undefined && (
-                                <View style={styles.keysBadge}>
-                                    <Key size={14} color={theme.colors.textSecondary} />
-                                    <Text style={styles.keysText}>{room.keysFound ? 'Keys Found' : 'No Keys'}</Text>
+                    {isEditing ? (
+                        <View style={{ gap: 10 }}>
+                            <View>
+                                <Text style={styles.inputLabel}>Current Guest (Required)</Text>
+                                <TextInput
+                                    style={styles.editInput}
+                                    value={tempCurrentGuest}
+                                    onChangeText={setTempCurrentGuest}
+                                    placeholder="Guest Name"
+                                />
+                            </View>
+
+                            {/* Logic: Disable Next Guest for Departure/Weekly/Rubbish */}
+                            {['DEPARTURE', 'WEEKLY', 'RUBBISH'].includes(tempCleaningType) ? (
+                                <Text style={styles.helperText}>* Next Guest not applicable for {tempCleaningType}</Text>
+                            ) : (
+                                <View>
+                                    <Text style={styles.inputLabel}>Next Guest</Text>
+                                    <TextInput
+                                        style={styles.editInput}
+                                        value={tempNextGuest}
+                                        onChangeText={setTempNextGuest}
+                                        placeholder="Next Guest Name"
+                                    />
                                 </View>
                             )}
                         </View>
-
-                        {/* Guest In Room Actions */}
-                        {room.guestStatus === 'IN_ROOM' && (
-                            <View style={styles.guestActions}>
-                                <TouchableOpacity style={styles.guestActionButton} onPress={handleNotifyReception}>
-                                    <Phone size={16} color={theme.colors.primary} />
-                                    <Text style={styles.guestActionText}>Notify Reception</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={[styles.guestActionButton, styles.guestActionOutline]} onPress={handleGuestLeft}>
-                                    <LogOut size={16} color={theme.colors.text} />
-                                    <Text style={[styles.guestActionText, { color: theme.colors.text }]}>Mark Guest Left</Text>
-                                </TouchableOpacity>
+                    ) : (
+                        <View style={styles.guestRow}>
+                            <View style={styles.guestInfoItem}>
+                                <User size={20} color={room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success} />
+                                <View>
+                                    <Text style={[
+                                        styles.guestStatusText,
+                                        { color: room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success }
+                                    ]}>
+                                        {room.guestStatus === 'IN_ROOM' ? 'Guest in Room' : 'Room Empty'}
+                                    </Text>
+                                    <Text style={{ fontSize: 14, color: theme.colors.text }}>Current: {room.guestDetails?.currentGuest || 'Unknown'}</Text>
+                                </View>
+                                {room.keysFound !== undefined && (
+                                    <View style={styles.keysBadge}>
+                                        <Key size={14} color={theme.colors.textSecondary} />
+                                        <Text style={styles.keysText}>{room.keysFound ? 'Keys Found' : 'No Keys'}</Text>
+                                    </View>
+                                )}
                             </View>
-                        )}
-                    </View>
 
-                    {room.cleaningType === 'DEPARTURE' && (
+                            {/* Guest In Room Actions */}
+                            {room.guestStatus === 'IN_ROOM' && (
+                                <View style={styles.guestActions}>
+                                    <TouchableOpacity style={styles.guestActionButton} onPress={handleNotifyReception}>
+                                        <Phone size={16} color={theme.colors.primary} />
+                                        <Text style={styles.guestActionText}>Notify Reception</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.guestActionButton, styles.guestActionOutline]} onPress={handleGuestLeft}>
+                                        <LogOut size={16} color={theme.colors.text} />
+                                        <Text style={[styles.guestActionText, { color: theme.colors.text }]}>Mark Guest Left</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {!isEditing && room.cleaningType === 'DEPARTURE' && (
                         <View style={styles.timeRow}>
                             <View style={styles.timeItem}>
                                 <LogOut size={16} color={theme.colors.textSecondary} />
@@ -457,7 +545,38 @@ export default function RoomDetailScreen() {
                     )}
                 </View>
             )}
-        </KeyboardAvoidingView>
+
+            {/* Cleaning Type Picker Modal */}
+            <Modal visible={showTypePicker} transparent animationType="slide">
+                <TouchableWithoutFeedback onPress={() => setShowTypePicker(false)}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Select Cleaning Type</Text>
+                                <ScrollView>
+                                    {(['DEPARTURE', 'PREARRIVAL', 'WEEKLY', 'HOLDOVER', 'RUBBISH', 'DAYUSE'] as CleaningType[]).map((type) => (
+                                        <TouchableOpacity
+                                            key={type}
+                                            style={[styles.typeOption, tempCleaningType === type && styles.typeOptionSelected]}
+                                            onPress={() => {
+                                                setTempCleaningType(type);
+                                                setShowTypePicker(false);
+                                            }}
+                                        >
+                                            <Text style={[styles.typeOptionText, tempCleaningType === type && styles.typeOptionTextSelected]}>{type}</Text>
+                                            {tempCleaningType === type && <Check size={20} color={theme.colors.primary} />}
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                                <TouchableOpacity style={styles.closeButton} onPress={() => setShowTypePicker(false)}>
+                                    <Text style={styles.closeButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+        </KeyboardAvoidingView >
     );
 }
 
@@ -466,6 +585,106 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: theme.colors.background,
         padding: theme.spacing.m,
+    },
+    cleaningTypeSelector: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.background,
+        padding: 10,
+        borderRadius: theme.borderRadius.s,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        marginTop: 5,
+        gap: 8
+    },
+    cleaningTypeSelectorText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: theme.colors.text
+    },
+    saveDetailsButton: {
+        backgroundColor: theme.colors.primary,
+        padding: 12,
+        borderRadius: theme.borderRadius.m,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8
+    },
+    saveDetailsText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16
+    },
+    editInput: {
+        backgroundColor: theme.colors.background,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        padding: 12,
+        borderRadius: theme.borderRadius.s,
+        fontSize: 16,
+    },
+    inputLabel: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        marginBottom: 4,
+        fontWeight: '500'
+    },
+    helperText: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        fontStyle: 'italic',
+        marginTop: 4
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: theme.colors.background,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        maxHeight: '50%'
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        textAlign: 'center'
+    },
+    typeOption: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border
+    },
+    typeOptionSelected: {
+        backgroundColor: theme.colors.primary + '10'
+    },
+    typeOptionText: {
+        fontSize: 16,
+        color: theme.colors.text
+    },
+    typeOptionTextSelected: {
+        color: theme.colors.primary,
+        fontWeight: 'bold'
+    },
+    closeButton: {
+        marginTop: 15,
+        padding: 15,
+        backgroundColor: theme.colors.card,
+        borderRadius: theme.borderRadius.m,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.border
+    },
+    closeButtonText: {
+        fontSize: 16,
+        fontWeight: '600'
     },
     headerCard: {
         alignItems: 'center',

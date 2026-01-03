@@ -24,6 +24,22 @@ class IncidentSerializer(serializers.ModelSerializer):
 class RoomSerializer(serializers.ModelSerializer):
     incidents = IncidentSerializer(many=True, read_only=True)
 
+    def validate(self, data):
+        cleaning_type = data.get('cleaning_type', self.instance.cleaning_type if self.instance else None)
+        current_guest = data.get('current_guest_name', self.instance.current_guest_name if self.instance else None)
+        next_guest = data.get('next_guest_name', self.instance.next_guest_name if self.instance else None)
+
+        # Rule 1: All types need current guest (Guest "Previous" or "Current")
+        if not current_guest:
+             raise serializers.ValidationError({"current_guest_name": "Current Guest Name is mandatory for all cleaning types."})
+
+        # Rule 2: Departure, Weekly, Rubbish -> No Next Guest
+        if cleaning_type in ['DEPARTURE', 'WEEKLY', 'RUBBISH']:
+            if next_guest:
+                 raise serializers.ValidationError({"next_guest_name": f"Cleaning type '{cleaning_type}' cannot have a Next Guest."})
+        
+        return data
+
     class Meta:
         model = Room
         fields = '__all__'

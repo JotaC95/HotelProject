@@ -33,12 +33,23 @@ class Room(models.Model):
         ('DND', 'Do Not Disturb'),
     )
 
+    CLEANING_TYPE_CHOICES = (
+        ('DEPARTURE', 'Departure'),
+        ('PREARRIVAL', 'Pre-arrival'),
+        ('WEEKLY', 'Weekly'),
+        ('HOLDOVER', 'Holdover'),
+        ('RUBBISH', 'Rubbish'),
+        ('DAYUSE', 'Day Use'),
+    )
+
     number = models.CharField(max_length=10, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
-    cleaning_type = models.CharField(max_length=50, default='DEPARTURE') # No choices constraint
+    cleaning_type = models.CharField(max_length=50, choices=CLEANING_TYPE_CHOICES, default='DEPARTURE')
     guest_status = models.CharField(max_length=20, choices=GUEST_STATUS_CHOICES, default='NO_GUEST')
     
-    assigned_group = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. 'Group 1'")
+    GROUP_CHOICES = tuple([(f'Group {i}', f'Group {i}') for i in range(1, 11)]) # Group 1 - Group 10
+
+    assigned_group = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. 'Group 1'", choices=GROUP_CHOICES)
     priority = models.BooleanField(default=False)
     
     # Maintenance Info

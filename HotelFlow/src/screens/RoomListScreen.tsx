@@ -5,13 +5,15 @@ import { useAuth, UserRole } from '../contexts/AuthContext';
 import { RoomCard } from '../components/RoomCard';
 import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
 import { theme } from '../utils/theme';
-import { Search, Filter, HandHelping, Bell, Package } from 'lucide-react-native'; // Clean icon for help
+import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase } from 'lucide-react-native'; // Clean icon for help
+import { NotificationsModal } from '../components/NotificationsModal';
+import { SkeletonRoomCard } from '../components/SkeletonRoomCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RoomStackParamList } from '../AppNavigator';
+import { RoomStackParamList, RootStackParamList } from '../AppNavigator';
 
-type NavigationProp = NativeStackNavigationProp<RoomStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
     const { session } = useHotel();
@@ -58,6 +60,90 @@ const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
     );
 };
 
+const DashboardHeader = () => {
+    const { user } = useAuth();
+    const { rooms, session, staff } = useHotel();
+
+    const stats = useMemo(() => {
+        if (!user) return null;
+
+        switch (user.role) {
+            case 'CLEANER': {
+                const myRooms = rooms.filter(r => r.assignedGroup === user.groupId);
+                const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
+                const total = myRooms.length;
+                return [
+                    { label: 'Assigned', value: total, icon: '🛏️' },
+                    { label: 'Done', value: completed, icon: '✅' },
+                    { label: 'Progress', value: `${total ? Math.round((completed / total) * 100) : 0}%`, icon: '📊' }
+                ];
+            }
+            case 'SUPERVISOR': {
+                const toInspect = rooms.filter(r => r.status === 'INSPECTION').length;
+                const activeStaff = staff?.length || 0; // Mock if staff list not populated
+                return [
+                    { label: 'To Inspect', value: toInspect, icon: '🔍', alert: toInspect > 0 },
+                    { label: 'Team Active', value: activeStaff, icon: '👥' },
+                    { label: 'Occupancy', value: `${Math.round((rooms.filter(r => r.guestStatus !== 'NO_GUEST').length / rooms.length) * 100)}%`, icon: '📈' }
+                ];
+            }
+            case 'MAINTENANCE': {
+                const openIncidents = rooms.reduce((acc, r) => acc + r.incidents.filter(i => i.status === 'OPEN').length, 0);
+                const highPriority = rooms.reduce((acc, r) => acc + r.incidents.filter(i => i.status === 'OPEN' && i.priority === 'HIGH').length, 0);
+                return [
+                    { label: 'Open Tasks', value: openIncidents, icon: '🛠️' },
+                    { label: 'Urgent', value: highPriority, icon: '⚠️', alert: highPriority > 0 },
+                    { label: 'Resolved', value: rooms.reduce((acc, r) => acc + r.incidents.filter(i => i.status === 'RESOLVED').length, 0), icon: '👍' }
+                ];
+            }
+            case 'RECEPTION': {
+                // Reception cares about Room Status for Check-in
+                const ready = rooms.filter(r => r.status === 'COMPLETED').length;
+                const dirty = rooms.filter(r => r.status === 'PENDING').length; // Or 'DIRTY' if mapped
+                return [
+                    { label: 'Ready', value: ready, icon: '✨' },
+                    { label: 'Dirty', value: dirty, icon: '🧹' },
+                    { label: 'Occupied', value: rooms.filter(r => r.guestStatus !== 'NO_GUEST').length, icon: '🏠' }
+                ];
+            }
+            default: return [];
+        }
+    }, [rooms, user, staff]);
+
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 18) return 'Good Afternoon';
+        return 'Good Evening';
+    }, []);
+
+    if (!stats) return null;
+
+    return (
+        <View style={styles.dashboardContainer}>
+            <View style={styles.dashboardHeader}>
+                <View>
+                    <Text style={styles.greetingText}>{greeting},</Text>
+                    <Text style={styles.userNameText}>{user?.name || user?.username}</Text>
+                </View>
+                <View style={styles.roleBadge}>
+                    <Text style={styles.roleText}>{user?.role}</Text>
+                </View>
+            </View>
+
+            <View style={styles.statsRow}>
+                {stats.map((stat, index) => (
+                    <View key={index} style={[styles.statCard, stat.alert && styles.statCardAlert]}>
+                        <Text style={styles.statIcon}>{stat.icon}</Text>
+                        <Text style={styles.statValue}>{stat.value}</Text>
+                        <Text style={[styles.statLabel, stat.alert && styles.statLabelAlert]}>{stat.label}</Text>
+                    </View>
+                ))}
+            </View>
+        </View>
+    );
+};
+
 export default function RoomListScreen() {
     const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession } = useHotel();
     const { user } = useAuth();
@@ -70,6 +156,32 @@ export default function RoomListScreen() {
 
     const isSupervisor = user?.role === 'SUPERVISOR';
     const isCleaner = user?.role === 'CLEANER';
+
+    const { announcements, fetchAnnouncements } = useHotel();
+    const [showNotifications, setShowNotifications] = useState(false);
+
+    React.useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <View style={{ flexDirection: 'row', gap: 15, marginRight: 10 }}>
+                    {(user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') && (
+                        <TouchableOpacity onPress={() => navigation.navigate('Analytics')}>
+                            <BarChart size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity onPress={() => navigation.navigate('LostFound')}>
+                        <Briefcase size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowNotifications(true)}>
+                        <View>
+                            <Bell size={24} color={theme.colors.primary} />
+                            {announcements.length > 0 && <View style={styles.badgeDot} />}
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            )
+        });
+    }, [navigation, user, announcements]);
 
     // --- Cleaner Help Logic ---
     const allRoomsCompleted = useMemo(() => {
@@ -163,21 +275,30 @@ export default function RoomListScreen() {
         });
 
         return result.sort((a, b) => {
-            // Supervisor Priority: INSPECTION first
+            // 1. Next Arrival High Priority
+            const hasArrivalA = !!a.guestDetails?.nextArrival;
+            const hasArrivalB = !!b.guestDetails?.nextArrival;
+            if (hasArrivalA && !hasArrivalB) return -1;
+            if (!hasArrivalA && hasArrivalB) return 1;
+
+            // 2. Supervisor Priority: INSPECTION first
             if (isSupervisor) {
                 if (a.status === 'INSPECTION' && b.status !== 'INSPECTION') return -1;
                 if (a.status !== 'INSPECTION' && b.status === 'INSPECTION') return 1;
             }
 
-            const guestInA = a.guestStatus === 'IN_ROOM';
-            const guestInB = b.guestStatus === 'IN_ROOM';
-            if (guestInA && !guestInB) return 1;
-            if (!guestInA && guestInB) return -1;
+            // 3. Guest In Room Priority (Usually lower priority for full cleaning, but higher for "Check" tasks? 
+            // User said "marked so they take into account". Usually empty rooms are prioritized for new arrivals.
+            // Let's stick to standard flow: Departure > Stayover.
+            // But if "Guest In Room", maybe push down? Or keep neutral. 
+            // Let's keep existing logic but after manual priority.
 
+            // 4. Manual Reception Priority
             const prioA = a.receptionPriority ?? 999;
             const prioB = b.receptionPriority ?? 999;
             if (prioA !== prioB) return prioA - prioB;
 
+            // 5. Cleaning Type Priority
             const isPreA = a.cleaningType === 'PREARRIVAL';
             const isPreB = b.cleaningType === 'PREARRIVAL';
             if (isPreA && !isPreB) return -1;
@@ -283,6 +404,14 @@ export default function RoomListScreen() {
                     }}>
                         <Package size={16} color={theme.colors.primary} />
                         <Text style={styles.suppliesText}>Supplies</Text>
+                        {/* Show open request count */}
+                        {systemIncidents.filter(i => i.user.includes(user.name) && i.status === 'OPEN').length > 0 && (
+                            <View style={{ backgroundColor: theme.colors.error, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+                                    {systemIncidents.filter(i => i.user.includes(user.name) && i.status === 'OPEN').length}
+                                </Text>
+                            </View>
+                        )}
                     </TouchableOpacity>
                 )}
 
@@ -333,8 +462,29 @@ export default function RoomListScreen() {
         </View>
     );
 
+    const isLoading = rooms.length === 0; // Simple check, or add proper loading state context
+
+    if (isLoading) {
+        return (
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <View style={[styles.headerContainer, { paddingHorizontal: 16 }]}>
+                    <Text style={{ fontSize: 24, fontWeight: 'bold' }}>All Rooms</Text>
+                </View>
+                <View style={{ padding: 16 }}>
+                    {[1, 2, 3, 4, 5].map(i => <SkeletonRoomCard key={i} />)}
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
+            {/* Dashboard Header - Role Specific */}
+            <DashboardHeader />
+
+            {/* Active Session Timer */}
+            {(isCleaner || isSupervisor) && <TimerDisplay totalMinutes={session.totalMinutes} />}
+
             <FlatList
                 data={filteredRooms}
                 keyExtractor={item => item.id}
@@ -348,7 +498,8 @@ export default function RoomListScreen() {
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={renderHeader}
             />
-        </View>
+            <NotificationsModal visible={showNotifications} onClose={() => setShowNotifications(false)} />
+        </SafeAreaView>
     );
 }
 
@@ -575,5 +726,86 @@ const styles = StyleSheet.create({
         fontSize: 32,
         fontWeight: '800',
         fontVariant: ['tabular-nums'],
+    },
+    badgeDot: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: 'red',
+        borderWidth: 1,
+        borderColor: 'white'
+    },
+    // Dashboard Styles
+    dashboardContainer: {
+        padding: theme.spacing.m,
+        backgroundColor: theme.colors.background,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+    },
+    dashboardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: theme.spacing.m,
+    },
+    greetingText: {
+        fontSize: 16,
+        color: theme.colors.textSecondary,
+    },
+    userNameText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+    },
+    roleBadge: {
+        backgroundColor: theme.colors.primary + '20',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    roleText: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+        fontSize: 12,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: theme.colors.card,
+        padding: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        ...theme.shadows.small,
+    },
+    statCardAlert: {
+        backgroundColor: theme.colors.error + '10',
+        borderWidth: 1,
+        borderColor: theme.colors.error,
+    },
+    statIcon: {
+        fontSize: 20,
+        marginBottom: 4,
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        marginBottom: 2,
+    },
+    statLabel: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+    },
+    statLabelAlert: {
+        color: theme.colors.error,
+        fontWeight: 'bold',
     },
 });

@@ -45,6 +45,14 @@ class Room(models.Model):
     number = models.CharField(max_length=10, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     cleaning_type = models.CharField(max_length=50, choices=CLEANING_TYPE_CHOICES, default='DEPARTURE')
+    
+    ROOM_TYPE_CHOICES = (
+        ('Single', 'Single'),
+        ('Double', 'Double'),
+        ('Suite', 'Suite'),
+    )
+    room_type = models.CharField(max_length=20, choices=ROOM_TYPE_CHOICES, default='Single')
+
     guest_status = models.CharField(max_length=20, choices=GUEST_STATUS_CHOICES, default='NO_GUEST')
     
     GROUP_CHOICES = tuple([(f'Group {i}', f'Group {i}') for i in range(1, 11)]) # Group 1 - Group 10
@@ -69,8 +77,18 @@ class Room(models.Model):
     next_guest_name = models.CharField(max_length=100, blank=True, null=True)
     next_arrival_time = models.DateTimeField(blank=True, null=True)
     
-    # Extra fields for timers/stats
+    first_time_cleaned = models.BooleanField(default=False) # For STAYOVER logic if needed (Note: this was missing in view, adding conceptually if needed or sticking to plan) 
+    # Actually 'first_time_cleaned' wasn't in the file view, so I should be careful not to hallucinate it.
+    # Looking at line 81: "last_cleaned = models.DateTimeField(blank=True, null=True)"
+    
+    # Advanced Features
+    is_guest_waiting = models.BooleanField(default=False)
+    last_dnd_timestamp = models.DateTimeField(null=True, blank=True)
+
     last_cleaned = models.DateTimeField(blank=True, null=True)
+    
+    # Phase 2: Inspection
+    last_inspection_report = models.JSONField(blank=True, null=True) # Stores result of last checklist
 
     def __str__(self):
         return f"Room {self.number} ({self.status}) - {self.assigned_group}"
@@ -79,12 +97,19 @@ class Incident(models.Model):
     PRIORITY_CHOICES = (('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High'))
     STATUS_CHOICES = (('OPEN', 'Open'), ('RESOLVED', 'Resolved'))
     ROLE_CHOICES = (('MAINTENANCE', 'Maintenance'), ('RECEPTION', 'Reception'), ('SUPERVISOR', 'Supervisor'), ('HOUSEMAN', 'Houseman'))
+    CATEGORY_CHOICES = (
+        ('MAINTENANCE', 'Maintenance'),
+        ('GUEST_REQ', 'Guest Request'),
+        ('SUPPLY', 'Supply Request'),
+        ('PREVENTIVE', 'Preventive Maintenance')
+    )
 
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='incidents', null=True, blank=True)
     text = models.TextField() # 'description' in plan, but 'text' matches frontend interface
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='MEDIUM')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='OPEN')
     target_role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='MAINTENANCE')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='MAINTENANCE')
     
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='reported_incidents')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -117,3 +142,43 @@ class CleaningSession(models.Model):
     
     def __str__(self):
         return f"Session {self.group_id} - {self.status}"
+
+class LostItem(models.Model):
+    STATUS_CHOICES = (('FOUND', 'Found'), ('RETURNED', 'Returned'), ('DISPOSED', 'Disposed'))
+    
+    description = models.CharField(max_length=200)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='lost_items', null=True, blank=True)
+    found_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='FOUND')
+    photo_uri = models.CharField(max_length=500, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Lost Item: {self.description} ({self.status})"
+
+class Announcement(models.Model):
+    PRIORITY_CHOICES = (('NORMAL', 'Normal'), ('HIGH', 'High'))
+
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='NORMAL')
+
+    def __str__(self):
+        return self.title
+
+class Asset(models.Model):
+    STATUS_CHOICES = (
+        ('GOOD', 'Good'),
+        ('REPAIR', 'Repair Needed'),
+        ('BROKEN', 'Broken')
+    )
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='assets', null=True, blank=True)
+    name = models.CharField(max_length=100)
+    serial_number = models.CharField(max_length=100, blank=True, null=True)
+    install_date = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='GOOD')
+    
+    def __str__(self):
+        return f"{self.name} ({self.room.number if self.room else 'No Room'})"

@@ -3,24 +3,37 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextI
 import { useHotel, Incident, Room } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
-import { CheckCircle, AlertTriangle, Wrench, XCircle, Clock, AlertCircle } from 'lucide-react-native';
+import { CheckCircle, AlertTriangle, Wrench, XCircle, Clock, AlertCircle, Plus, Box, Package } from 'lucide-react-native'; // Added Box, Package
 
 export default function MaintenanceScreen() {
-    const { rooms, resolveIncident, updateRoomStatus, startMaintenance } = useHotel();
+    const { rooms, resolveIncident, updateRoomStatus, startMaintenance, addIncident, assets, addAsset, updateAssetStatus, fetchAssets } = useHotel(); // Added assets
     const { logout, user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'TASKS' | 'BLOCKED'>('TASKS');
+    const [activeTab, setActiveTab] = useState<'TASKS' | 'BLOCKED' | 'PREVENTIVE' | 'ASSETS'>('TASKS');
     const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
     const [maintenanceReason, setMaintenanceReason] = useState('');
 
+    // Preventive Modal State
+    const [preventiveModalVisible, setPreventiveModalVisible] = useState(false);
+    const [prevRoomNum, setPrevRoomNum] = useState('');
+    const [prevDesc, setPrevDesc] = useState('');
+
+    // Asset Modal State
+    const [assetModalVisible, setAssetModalVisible] = useState(false);
+    const [newAssetName, setNewAssetName] = useState('');
+    const [newAssetSerial, setNewAssetSerial] = useState('');
+
     // --- Work Orders (Open Incidents) ---
-    const workOrders = rooms.reduce<{ incident: Incident, roomNumber: string, roomId: string }[]>((acc, room) => {
+    const allWorkOrders = rooms.reduce<{ incident: Incident, roomNumber: string, roomId: string }[]>((acc, room) => {
         const roomIncidents = room.incidents
             // Filter: Only Maintenance role, Status OPEN
             .filter(inc => inc.targetRole === 'MAINTENANCE' && inc.status === 'OPEN')
             .map(inc => ({ incident: inc, roomNumber: room.number, roomId: room.id }));
         return [...acc, ...roomIncidents];
-    }, []).sort((a, b) => new Date(b.incident.timestamp).getTime() - new Date(a.incident.timestamp).getTime()); // Newest first
+    }, []).sort((a, b) => new Date(b.incident.timestamp).getTime() - new Date(a.incident.timestamp).getTime());
+
+    const reactiveOrders = allWorkOrders.filter(w => w.incident.category !== 'PREVENTIVE');
+    const preventiveOrders = allWorkOrders.filter(w => w.incident.category === 'PREVENTIVE');
 
     // --- Blocked Rooms (Maintenance Status) ---
     const blockedRooms = rooms.filter(r => r.status === 'MAINTENANCE');
@@ -43,10 +56,63 @@ export default function MaintenanceScreen() {
         setMaintenanceReason('');
     };
 
+    const handleCreatePreventive = () => {
+        if (!prevRoomNum || !prevDesc) {
+            Alert.alert("Error", "Room and Description required");
+            return;
+        }
+        const room = rooms.find(r => r.number === prevRoomNum);
+        if (!room) {
+            Alert.alert("Error", "Room not found");
+            return;
+        }
+
+        // IncidentRole: 'MAINTENANCE'
+        // Group: undefined (or user.groupId)
+        // Category: 'PREVENTIVE'
+        const reporterName = user?.username || 'Maintenance';
+        addIncident(room.id, prevDesc, reporterName, 'MAINTENANCE', undefined, undefined, 'PREVENTIVE');
+
+        setPreventiveModalVisible(false);
+        setPrevRoomNum('');
+        setPrevDesc('');
+        Alert.alert("Success", "Preventive task scheduled");
+    };
+
+    const handleCreateAsset = () => {
+        if (!newAssetName || !selectedRoomId) {
+            Alert.alert("Error", "Name and Room required");
+            return;
+        }
+        // Need to convert selectedRoomId to number if backend expects number, which it does from serializer room_number? 
+        // Wait, backend Asset model expects 'room' ID (pk).
+        // Let's pass the object as expected by AddAsset in context.
+        addAsset({
+            name: newAssetName,
+            room: selectedRoomId, // Ensure this maps to ID
+            serial_number: newAssetSerial,
+            // status: 'GOOD' // Removed as it causes lint error and backend likely defaults it
+        });
+        setAssetModalVisible(false);
+        setNewAssetName('');
+        setNewAssetSerial('');
+        setSelectedRoomId(null);
+    };
+
+    // Helper for Asset Status Color
+    const getAssetColor = (status: string) => {
+        switch (status) {
+            case 'GOOD': return theme.colors.success;
+            case 'REPAIR': return theme.colors.warning;
+            case 'BROKEN': return theme.colors.error;
+            default: return theme.colors.textSecondary;
+        }
+    };
+
     const renderWorkOrder = ({ item }: { item: { incident: Incident, roomNumber: string, roomId: string } }) => (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
-                <View style={styles.roomBadge}>
+                <View style={[styles.roomBadge, item.incident.category === 'PREVENTIVE' ? { backgroundColor: theme.colors.success } : {}]}>
                     <Text style={styles.roomText}>{item.roomNumber}</Text>
                 </View>
                 <View style={styles.metaContainer}>
@@ -63,6 +129,13 @@ export default function MaintenanceScreen() {
                     </View>
                 ) : null}
                 <View style={styles.textContainer}>
+                    {item.incident.category === 'PREVENTIVE' && (
+                        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                            <View style={{ backgroundColor: '#E6FFFA', paddingHorizontal: 6, borderRadius: 4 }}>
+                                <Text style={{ color: '#2C7A7B', fontSize: 10, fontWeight: 'bold' }}>PREVENTIVE</Text>
+                            </View>
+                        </View>
+                    )}
                     <Text style={styles.description}>{item.incident.text}</Text>
                     <Text style={styles.reporter}>Reported by: {item.incident.user}</Text>
                 </View>
@@ -122,7 +195,16 @@ export default function MaintenanceScreen() {
                 >
                     <AlertCircle size={16} color={activeTab === 'TASKS' ? 'white' : theme.colors.textSecondary} />
                     <Text style={[styles.tabText, activeTab === 'TASKS' && styles.activeTabText]}>
-                        Open Tasks ({workOrders.length})
+                        Open ({reactiveOrders.length})
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'PREVENTIVE' && styles.activeTab]}
+                    onPress={() => setActiveTab('PREVENTIVE')}
+                >
+                    <Clock size={16} color={activeTab === 'PREVENTIVE' ? 'white' : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'PREVENTIVE' && styles.activeTabText]}>
+                        Preventive ({preventiveOrders.length})
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -131,28 +213,57 @@ export default function MaintenanceScreen() {
                 >
                     <Wrench size={16} color={activeTab === 'BLOCKED' ? 'white' : theme.colors.textSecondary} />
                     <Text style={[styles.tabText, activeTab === 'BLOCKED' && styles.activeTabText]}>
-                        Blocked Rooms ({blockedRooms.length})
+                        Blocked ({blockedRooms.length})
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'ASSETS' && styles.activeTab]}
+                    onPress={() => { setActiveTab('ASSETS'); fetchAssets(); }}
+                >
+                    <Package size={16} color={activeTab === 'ASSETS' ? 'white' : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'ASSETS' && styles.activeTabText]}>
+                        Assets
                     </Text>
                 </TouchableOpacity>
             </View>
 
-            {activeTab === 'TASKS' ? (
+            {activeTab === 'TASKS' && (
                 <FlatList
-                    data={workOrders}
+                    data={reactiveOrders}
                     renderItem={renderWorkOrder}
                     keyExtractor={item => item.incident.id}
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <CheckCircle size={48} color={theme.colors.success} />
-                            <Text style={styles.emptyText}>All systems operational.</Text>
-                            <Text style={styles.emptySubtext}>No open maintenance requests.</Text>
+                            <Text style={styles.emptyText}>All reactive tasks cleared.</Text>
                         </View>
                     }
                 />
-            ) : (
+            )}
+
+            {activeTab === 'PREVENTIVE' && (
                 <View style={{ flex: 1 }}>
-                    {/* Add Logic to block a NEW room */}
+                    <TouchableOpacity style={styles.blockNewButton} onPress={() => setPreventiveModalVisible(true)}>
+                        <Plus size={20} color="white" />
+                        <Text style={styles.blockNewText}> New Preventive Task</Text>
+                    </TouchableOpacity>
+                    <FlatList
+                        data={preventiveOrders}
+                        renderItem={renderWorkOrder}
+                        keyExtractor={item => item.incident.id}
+                        contentContainerStyle={styles.list}
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyText}>No preventive maintenance scheduled.</Text>
+                            </View>
+                        }
+                    />
+                </View>
+            )}
+
+            {activeTab === 'BLOCKED' && (
+                <View style={{ flex: 1 }}>
                     <TouchableOpacity
                         style={styles.blockNewButton}
                         onPress={() => setMaintenanceModalVisible(true)}
@@ -168,6 +279,45 @@ export default function MaintenanceScreen() {
                         ListEmptyComponent={
                             <View style={styles.emptyState}>
                                 <Text style={styles.emptyText}>No rooms currently blocked.</Text>
+                            </View>
+                        }
+                    />
+                </View>
+            )}
+
+            {activeTab === 'ASSETS' && (
+                <View style={{ flex: 1 }}>
+                    <TouchableOpacity style={[styles.blockNewButton, { backgroundColor: theme.colors.primary }]} onPress={() => setAssetModalVisible(true)}>
+                        <Plus size={20} color="white" />
+                        <Text style={styles.blockNewText}> Add New Asset</Text>
+                    </TouchableOpacity>
+                    <FlatList
+                        data={assets}
+                        keyExtractor={item => item.id.toString()}
+                        contentContainerStyle={styles.list}
+                        renderItem={({ item }) => (
+                            <View style={styles.card}>
+                                <View style={styles.cardHeader}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.cardTitle}>{item.name}</Text>
+                                        <Text style={styles.cardSubtitle}>Room {item.room_number || 'Unassigned'} • SN: {item.serial_number || 'N/A'}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={[styles.statusBadge, { backgroundColor: getAssetColor(item.status) }]}
+                                        onPress={() => {
+                                            const nextStatus = item.status === 'GOOD' ? 'REPAIR' : item.status === 'REPAIR' ? 'BROKEN' : 'GOOD';
+                                            updateAssetStatus(item.id, nextStatus as any);
+                                        }}
+                                    >
+                                        <Text style={styles.statusText}>{item.status}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
+                        ListEmptyComponent={
+                            <View style={styles.emptyState}>
+                                <Package size={48} color={theme.colors.textSecondary} />
+                                <Text style={styles.emptyText}>No assets tracked.</Text>
                             </View>
                         }
                     />
@@ -221,7 +371,102 @@ export default function MaintenanceScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+
+            {/* Preventive Maintenance Modal */}
+            <Modal
+                transparent={true}
+                visible={preventiveModalVisible}
+                animationType="slide"
+                onRequestClose={() => setPreventiveModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Schedule Preventive Maintenance</Text>
+
+                        <Text style={styles.label}>Room Number</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. 101"
+                            value={prevRoomNum}
+                            onChangeText={setPrevRoomNum}
+                            keyboardType="numeric"
+                        />
+
+                        <Text style={styles.label}>Task Description</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. Filter Check, Battery Replacement"
+                            value={prevDesc}
+                            onChangeText={setPrevDesc}
+                        />
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.modalCancel} onPress={() => setPreventiveModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalSubmit} onPress={handleCreatePreventive}>
+                                <Text style={styles.modalSubmitText}>Create Task</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Add Asset Modal */}
+            <Modal
+                transparent={true}
+                visible={assetModalVisible}
+                animationType="slide"
+                onRequestClose={() => setAssetModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Add New Asset</Text>
+
+                        <Text style={styles.label}>Asset Name</Text>
+                        <TextInput
+                            style={[styles.input, { minHeight: 50 }]}
+                            placeholder="e.g. Air Conditioner"
+                            value={newAssetName}
+                            onChangeText={setNewAssetName}
+                        />
+
+                        <Text style={styles.label}>Serial Number (Optional)</Text>
+                        <TextInput
+                            style={[styles.input, { minHeight: 50 }]}
+                            placeholder="e.g. SN-12345"
+                            value={newAssetSerial}
+                            onChangeText={setNewAssetSerial}
+                        />
+
+                        <Text style={styles.label}>Select Room</Text>
+                        <View style={{ maxHeight: 150 }}>
+                            <FlatList
+                                data={rooms}
+                                keyExtractor={r => r.id}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={[styles.roomOption, selectedRoomId === item.id && styles.selectedRoomOption]}
+                                        onPress={() => setSelectedRoomId(item.id)}
+                                    >
+                                        <Text style={selectedRoomId === item.id ? styles.selectedRoomText : styles.roomOptionText}>Room {item.number}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.modalCancel} onPress={() => setAssetModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalSubmit, { backgroundColor: theme.colors.primary }]} onPress={handleCreateAsset}>
+                                <Text style={styles.modalSubmitText}>Save Asset</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </View >
     );
 }
 
@@ -243,7 +488,9 @@ const styles = StyleSheet.create({
     card: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
 
     // Work Order Styles
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }, // Updated alignment
+    cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#2D3748' }, // New
+    cardSubtitle: { fontSize: 13, color: '#718096' }, // New
     roomBadge: { backgroundColor: '#EDF2F7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
     roomText: { fontWeight: 'bold', color: '#2D3748' },
     metaContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Room, useHotel } from '../contexts/HotelContext';
 import { theme } from '../utils/theme';
 import { StatusBadge } from './StatusBadge';
-import { AlertTriangle, Moon, Clock } from 'lucide-react-native';
+import { AlertTriangle, Moon, Clock, UserCheck } from 'lucide-react-native';
 
 interface Props {
     room: Room;
@@ -21,7 +21,13 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup }) => {
             onPress={onPress}
             activeOpacity={0.7}
         >
-            <View style={styles.header}>
+            {room.isGuestWaiting && (
+                <View style={styles.rushBanner}>
+                    <AlertTriangle size={12} color="white" />
+                    <Text style={styles.rushText}>GUEST WAITING</Text>
+                </View>
+            )}
+            <View style={[styles.header, room.isGuestWaiting && { marginTop: 4 }]}>
                 <View style={styles.roomInfo}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Text style={styles.roomNumber}>Room {room.number}</Text>
@@ -50,11 +56,11 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup }) => {
                         </Text>
                     )}
 
-                    {/* Pre-Arrival Next Guest */}
-                    {room.cleaningType === 'PREARRIVAL' && room.guestDetails?.nextGuest && (
+                    {/* Next Guest / Arrival Info (Any type) */}
+                    {(room.guestDetails?.nextGuest || room.guestDetails?.nextArrival) && (
                         <Text style={styles.nextGuestText} numberOfLines={1}>
-                            🔜 Next: {room.guestDetails.nextGuest}
-                            {room.guestDetails.nextArrival ? ` (${new Date(room.guestDetails.nextArrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}
+                            🔜 {room.guestDetails.nextGuest || 'Pending'}
+                            {room.guestDetails.nextArrival ? ` @ ${room.guestDetails.nextArrival}` : ''}
                         </Text>
                     )}
                 </View>
@@ -63,10 +69,18 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup }) => {
 
             <View style={styles.footer}>
                 <View style={styles.icons}>
+                    {room.guestStatus === 'GUEST_IN_ROOM' && (
+                        <View style={[styles.iconTag, { backgroundColor: theme.colors.warning + '20' }]}>
+                            <UserCheck size={14} color={theme.colors.warning} />
+                            <Text style={[styles.iconText, { color: theme.colors.warning }]}>Guest In Room</Text>
+                        </View>
+                    )}
                     {room.isDND && (
                         <View style={[styles.iconTag, { backgroundColor: theme.colors.secondary + '20' }]}>
                             <Moon size={14} color={theme.colors.secondary} />
-                            <Text style={[styles.iconText, { color: theme.colors.secondary }]}>DND</Text>
+                            <Text style={[styles.iconText, { color: theme.colors.secondary }]}>
+                                DND {room.lastDndTimestamp ? `(${new Date(room.lastDndTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}
+                            </Text>
                         </View>
                     )}
                     {room.extraTime && (
@@ -188,9 +202,25 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 4,
     },
+
     groupBadgeText: {
         color: 'white', // Ensure text is white or contrasting
         fontSize: 10,
         fontWeight: 'bold',
+    },
+    rushBanner: {
+        backgroundColor: theme.colors.error,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 4,
+        borderRadius: 4,
+        marginBottom: 8,
+        gap: 6
+    },
+    rushText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12
     }
 });

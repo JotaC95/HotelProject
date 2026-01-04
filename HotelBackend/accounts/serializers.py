@@ -6,7 +6,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'role', 'group_id', 'first_name', 'last_name', 'password']
+        fields = ['id', 'username', 'email', 'role', 'group_id', 'first_name', 'last_name', 'password', 'expo_push_token', 'avatar_url']
 
     def create(self, validated_data):
         # Use create_user to handle password hashing

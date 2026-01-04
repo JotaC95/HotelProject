@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = 'https://c16b1706915e.ngrok-free.app/api';
+// const BASE_URL = 'https://20f4778c3372.ngrok-free.app/api'; // Ngrok Backup
+const BASE_URL = 'http://192.168.0.171:8000/api'; // Local LAN IP
 
 const api = axios.create({
   baseURL: BASE_URL,

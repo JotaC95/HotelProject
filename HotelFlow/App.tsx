@@ -4,13 +4,17 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { HotelProvider } from './src/contexts/HotelContext';
 import { AppNavigator } from './src/AppNavigator';
 
+import { ToastProvider } from './src/contexts/ToastContext';
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <HotelProvider>
-          <AppNavigator />
-        </HotelProvider>
+        <ToastProvider>
+          <HotelProvider>
+            <AppNavigator />
+          </HotelProvider>
+        </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

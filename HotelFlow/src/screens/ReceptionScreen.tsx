@@ -4,18 +4,32 @@ import { useHotel, Room, Staff, CleaningType } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { RoomCard } from '../components/RoomCard';
-import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase } from 'lucide-react-native';
+import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase, Bell } from 'lucide-react-native';
+import { NotificationsModal } from '../components/NotificationsModal';
+
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../AppNavigator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceptionScreen() {
-    const { rooms, staff, setPriority, fetchStaff, updateStaffGroup, createRoom, startMaintenance, assignRoomToGroup } = useHotel();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    const { rooms, staff, setPriority, fetchStaff, updateStaffGroup, createRoom, startMaintenance, assignRoomToGroup, announcements, addIncident, resolveIncident, moveGuest } = useHotel(); // Added moveGuest
     const { logout, user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'STAFF' | 'ROOMS'>('DASHBOARD');
+    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'STAFF' | 'ROOMS' | 'REQUESTS'>('DASHBOARD'); // Added REQUESTS
+    const [notificationsVisible, setNotificationsVisible] = useState(false);
+    const insets = useSafeAreaInsets();
 
     // UI State for Modals
     const [addRoomModalVisible, setAddRoomModalVisible] = useState(false);
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [newRoomType, setNewRoomType] = useState('Single');
     const [newCleaningType, setNewCleaningType] = useState<CleaningType>('DEPARTURE');
+
+    // Guest Request Modal
+    const [requestModalVisible, setRequestModalVisible] = useState(false);
+    const [requestRoomNumber, setRequestRoomNumber] = useState('');
+    const [requestDesc, setRequestDesc] = useState('');
 
     // Maintenance Modal 
     const [maintModalVisible, setMaintModalVisible] = useState(false);
@@ -27,6 +41,21 @@ export default function ReceptionScreen() {
     const [targetId, setTargetId] = useState<string | number | null>(null); // Room ID (string) or Staff ID (number)
     const [isAssigningStaff, setIsAssigningStaff] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
+
+    // Room Move Logic
+    const [moveModalVisible, setMoveModalVisible] = useState(false);
+    const [moveFromId, setMoveFromId] = useState<string | null>(null);
+    const [moveToId, setMoveToId] = useState<string | null>(null);
+
+    const handleMoveGuest = async () => {
+        if (moveFromId && moveToId) {
+            await moveGuest(moveFromId, moveToId);
+            setMoveModalVisible(false);
+            setMoveFromId(null);
+            setMoveToId(null);
+        }
+    };
+
 
     // Get unique existing groups
     const uniqueGroups = Array.from(new Set(staff.map(s => s.groupId).filter(Boolean))) as string[];
@@ -46,6 +75,25 @@ export default function ReceptionScreen() {
             assignRoomToGroup(targetId as string, groupName);
         }
         setTeamModalVisible(false);
+    };
+
+    const handleCreateRequest = () => {
+        if (!requestRoomNumber || !requestDesc) {
+            Alert.alert("Error", "Please enter room number and description");
+            return;
+        }
+
+        const room = rooms.find(r => r.number === requestRoomNumber);
+        if (!room) {
+            Alert.alert("Error", "Room not found");
+            return;
+        }
+
+        addIncident(room.id, requestDesc, user?.username || 'Reception', 'RECEPTION', undefined, undefined, 'GUEST_REQ');
+        setRequestModalVisible(false);
+        setRequestRoomNumber('');
+        setRequestDesc('');
+        Alert.alert("Success", "Guest request logged.");
     };
 
     useEffect(() => {
@@ -127,26 +175,40 @@ export default function ReceptionScreen() {
                     <Text style={styles.statLabel}>Departures</Text>
                 </View>
                 <View style={styles.statCard}>
-                    <View style={[styles.iconBox, { backgroundColor: '#F0FFF4' }]}>
-                        <CheckCircle size={20} color="#38A169" />
+                    <View style={[styles.iconBox, { backgroundColor: '#FFF5F5' }]}>
+                        <Users size={20} color="#E53E3E" />
                     </View>
-                    <Text style={styles.statNumber}>{readyRooms}</Text>
-                    <Text style={styles.statLabel}>Ready Rooms</Text>
+                    <Text style={styles.statNumber}>{rooms.filter(r => r.guestStatus === 'GUEST_IN_ROOM').length}</Text>
+                    <Text style={styles.statLabel}>In Room</Text>
                 </View>
             </View>
 
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Priority Watchlist</Text>
             </View>
-            {/* Only show Priority Rooms here */}
-            {rooms.filter(r => r.receptionPriority).map(room => (
-                <View key={room.id} style={styles.simpleRow}>
+            {/* Show Priority Rooms: Manually Starred OR Next Arrival Set */}
+            {rooms.filter(r => r.receptionPriority || r.guestDetails?.nextArrival).sort((a, b) => {
+                // Sort by: Manual Priority > Next Arrival Time
+                if (a.receptionPriority && !b.receptionPriority) return -1;
+                if (!a.receptionPriority && b.receptionPriority) return 1;
+                return (a.guestDetails?.nextArrival || '').localeCompare(b.guestDetails?.nextArrival || '');
+            }).map(room => (
+                <TouchableOpacity key={room.id} style={styles.simpleRow} onPress={() => navigation.navigate('RoomDetail', { roomId: room.id })}>
                     <Text style={styles.rowText}>Room {room.number}</Text>
-                    <View style={styles.vipBadge}><Text style={styles.vipText}>VIP</Text></View>
-                </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {room.guestDetails?.nextArrival && (
+                            <View style={[styles.vipBadge, { backgroundColor: theme.colors.primary }]}>
+                                <Text style={styles.vipText}>@{new Date(room.guestDetails.nextArrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                            </View>
+                        )}
+                        {room.receptionPriority === 1 && (
+                            <View style={styles.vipBadge}><Text style={styles.vipText}>VIP</Text></View>
+                        )}
+                    </View>
+                </TouchableOpacity>
             ))}
-            {rooms.filter(r => r.receptionPriority).length === 0 && (
-                <Text style={styles.emptyText}>No VIP rooms set.</Text>
+            {rooms.filter(r => r.receptionPriority || r.guestDetails?.nextArrival).length === 0 && (
+                <Text style={styles.emptyText}>No priority watch items.</Text>
             )}
         </ScrollView>
     );
@@ -194,6 +256,13 @@ export default function ReceptionScreen() {
         <View style={styles.content}>
             <View style={styles.rowBetween}>
                 <Text style={styles.sectionTitle}>Room Management</Text>
+                <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: theme.colors.warning }]}
+                    onPress={() => setMoveModalVisible(true)}
+                >
+                    <Briefcase size={16} color="white" />
+                    <Text style={styles.addButtonText}>Move Guest</Text>
+                </TouchableOpacity>
             </View>
 
             <FlatList
@@ -203,16 +272,18 @@ export default function ReceptionScreen() {
                 renderItem={({ item }) => (
                     <View style={[styles.roomEditRow, { alignItems: 'flex-start' }]}>
                         <View style={{ flex: 1, marginRight: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2D3748', marginRight: 8 }}>
-                                    {item.number}
-                                </Text>
-                                <View style={{ backgroundColor: getStatusColor(item.status) + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                                    <Text style={{ color: getStatusColor(item.status), fontSize: 10, fontWeight: '700' }}>
-                                        {item.status}
+                            <TouchableOpacity onPress={() => navigation.navigate('RoomDetail', { roomId: item.id })}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2D3748', marginRight: 8 }}>
+                                        {item.number}
                                     </Text>
+                                    <View style={{ backgroundColor: getStatusColor(item.status) + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                        <Text style={{ color: getStatusColor(item.status), fontSize: 10, fontWeight: '700' }}>
+                                            {item.status}
+                                        </Text>
+                                    </View>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
 
                             <Text style={{ fontSize: 13, color: '#718096', marginBottom: 8 }}>
                                 {item.type} • {item.cleaningType.replace('_', ' ')}
@@ -295,14 +366,22 @@ export default function ReceptionScreen() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
                 <View>
                     <Text style={styles.headerTitle}>Reception Manager</Text>
                     <Text style={styles.headerSubtitle}>Logged in as {user?.username}</Text>
                 </View>
-                <TouchableOpacity onPress={logout} style={styles.logoutButton}>
-                    <LogOut size={20} color={theme.colors.primary} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 15 }}>
+                    <TouchableOpacity onPress={() => setNotificationsVisible(true)}>
+                        <View>
+                            <Bell size={24} color={theme.colors.primary} />
+                            {announcements.length > 0 && <View style={styles.badgeDot} />}
+                        </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+                        <LogOut size={20} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Navigation Tabs */}
@@ -328,11 +407,82 @@ export default function ReceptionScreen() {
                     <Home size={18} color={activeTab === 'ROOMS' ? theme.colors.primary : '#A0AEC0'} />
                     <Text style={[styles.navTabText, activeTab === 'ROOMS' && styles.navTextActive]}>Rooms</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.navTab, activeTab === 'REQUESTS' && styles.navTabActive]}
+                    onPress={() => setActiveTab('REQUESTS')}
+                >
+                    <Briefcase size={18} color={activeTab === 'REQUESTS' ? theme.colors.primary : '#A0AEC0'} />
+                    <Text style={[styles.navTabText, activeTab === 'REQUESTS' && styles.navTextActive]}>Requests</Text>
+                </TouchableOpacity>
             </View>
 
             {activeTab === 'DASHBOARD' && renderDashboard()}
             {activeTab === 'STAFF' && renderStaff()}
             {activeTab === 'ROOMS' && renderRooms()}
+            {activeTab === 'REQUESTS' && (
+                <View style={styles.content}>
+                    <TouchableOpacity style={styles.addItemButton} onPress={() => setRequestModalVisible(true)}>
+                        <Plus size={20} color="white" />
+                        <Text style={styles.addItemText}>New Guest Request</Text>
+                    </TouchableOpacity>
+                    <FlatList
+                        data={rooms.flatMap(r => r.incidents.map(i => ({ ...i, roomNumber: r.number, roomId: r.id }))).filter(i => i.category === 'GUEST_REQ')}
+                        keyExtractor={item => item.id}
+                        renderItem={({ item }) => (
+                            <View style={styles.listCard}>
+                                <View style={styles.listHeader}>
+                                    <Text style={styles.listTitle}>Room {item.roomNumber}</Text>
+                                    <Text style={[styles.statusBadge, { color: item.status === 'OPEN' ? 'orange' : 'green' }]}>{item.status}</Text>
+                                </View>
+                                <Text style={styles.listSubtitle}>{item.text}</Text>
+                                <Text style={styles.listMeta}>Requested by {item.user} • {new Date(item.timestamp).toLocaleTimeString()}</Text>
+                                {item.status === 'OPEN' && (
+                                    <TouchableOpacity style={styles.resolveButton} onPress={() => resolveIncident(item.roomId!, item.id)}>
+                                        <CheckCircle size={16} color="white" />
+                                        <Text style={styles.resolveButtonText}>Complete</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+                        ListEmptyComponent={<Text style={styles.emptyText}>No active guest requests.</Text>}
+                    />
+                </View>
+            )}
+
+            {/* Guest Request Modal */}
+            <Modal
+                transparent={true}
+                visible={requestModalVisible}
+                animationType="slide"
+                onRequestClose={() => setRequestModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>New Guest Request</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Room Number (e.g. 101)"
+                            value={requestRoomNumber}
+                            onChangeText={setRequestRoomNumber}
+                            keyboardType="numeric"
+                        />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Request (e.g. Extra Pillow)"
+                            value={requestDesc}
+                            onChangeText={setRequestDesc}
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.modalCancel} onPress={() => setRequestModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalSubmit} onPress={handleCreateRequest}>
+                                <Text style={styles.modalSubmitText}>Create</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Add Room Modal */}
             <Modal
@@ -468,6 +618,67 @@ export default function ReceptionScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                transparent={true}
+                visible={moveModalVisible}
+                animationType="slide"
+                onRequestClose={() => setMoveModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Move Guest</Text>
+
+                        <Text style={styles.label}>Move From (Occupied)</Text>
+                        <ScrollView style={{ maxHeight: 150, marginBottom: 15 }}>
+                            {rooms.filter(r => r.guestDetails?.currentGuest).map(r => (
+                                <TouchableOpacity
+                                    key={r.id}
+                                    style={[styles.typeOption, moveFromId === r.id && styles.typeActive, { marginBottom: 6 }]}
+                                    onPress={() => setMoveFromId(r.id)}
+                                >
+                                    <Text style={[styles.typeText, moveFromId === r.id && { color: 'white' }]}>
+                                        {r.number} - {r.guestDetails?.currentGuest}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.label}>Move To (Vacant/Clean)</Text>
+                        <ScrollView style={{ maxHeight: 150, marginBottom: 15 }}>
+                            {rooms.filter(r => !r.guestDetails?.currentGuest && (r.status === 'COMPLETED' || r.status === 'INSPECTION')).map(r => (
+                                <TouchableOpacity
+                                    key={r.id}
+                                    style={[styles.typeOption, moveToId === r.id && styles.typeActive, { marginBottom: 6 }]}
+                                    onPress={() => setMoveToId(r.id)}
+                                >
+                                    <Text style={[styles.typeText, moveToId === r.id && { color: 'white' }]}>
+                                        {r.number} ({r.type})
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.modalCancel} onPress={() => setMoveModalVisible(false)}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalSubmit, (!moveFromId || !moveToId) && { opacity: 0.5 }]}
+                                onPress={handleMoveGuest}
+                                disabled={!moveFromId || !moveToId}
+                            >
+                                <Text style={styles.modalSubmitText}>Confirm Move</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <NotificationsModal
+                visible={notificationsVisible}
+                onClose={() => setNotificationsVisible(false)}
+            />
         </View>
     );
 }
@@ -546,4 +757,79 @@ const styles = StyleSheet.create({
     modalSubmitText: { color: 'white', fontWeight: 'bold' },
     optionRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#EDF2F7' },
     optionText: { fontSize: 16, color: '#4A5568' },
+    badgeDot: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: 'red',
+        borderWidth: 1,
+        borderColor: 'white'
+    },
+    // Guest Request Styles
+    addItemButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        backgroundColor: theme.colors.primary + '10',
+        borderRadius: 8,
+        gap: 6
+    },
+    addItemText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.primary
+    },
+    listCard: {
+        backgroundColor: 'white',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 5
+    },
+    listHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8
+    },
+    listTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#2D3748'
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: '#EDF2F7'
+    },
+    listSubtitle: {
+        fontSize: 14,
+        color: '#4A5568',
+        marginBottom: 4
+    },
+    listMeta: {
+        fontSize: 12,
+        color: '#A0AEC0'
+    },
+    resolveButton: {
+        marginTop: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.success + '10',
+        padding: 10,
+        borderRadius: 8,
+        gap: 8
+    },
+    resolveButtonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.success
+    }
 });

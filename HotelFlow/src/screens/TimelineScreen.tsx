@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Share, Alert } from 'react-native';
 import { useHotel, LogEntry } from '../contexts/HotelContext';
 import { theme } from '../utils/theme';
-import { Activity, Download, FileText } from 'lucide-react-native';
+import { Activity, Download, FileText, GanttChart, List } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { TimelineGantt } from '../components/TimelineGantt';
 
 // Fix for strict typing on documentDirectory
 // @ts-ignore
@@ -14,8 +15,9 @@ const reportDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
 
 
 export default function TimelineScreen() {
-    const { logs, exportData } = useHotel();
+    const { logs, exportData, rooms } = useHotel();
     const { user } = useAuth();
+    const [viewMode, setViewMode] = useState<'LOG' | 'GANTT'>('LOG');
 
     const isSupervisor = user?.role === 'SUPERVISOR';
 
@@ -75,6 +77,22 @@ export default function TimelineScreen() {
                 <Text style={styles.title}>Activity Log</Text>
                 {isSupervisor && (
                     <View style={styles.exportButtons}>
+                        {/* View Toggle */}
+                        <View style={{ flexDirection: 'row', backgroundColor: '#EDF2F7', borderRadius: 8, padding: 2, marginRight: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.toggleBtn, viewMode === 'LOG' && styles.toggleBtnActive]}
+                                onPress={() => setViewMode('LOG')}
+                            >
+                                <List size={16} color={viewMode === 'LOG' ? theme.colors.primary : '#A0AEC0'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.toggleBtn, viewMode === 'GANTT' && styles.toggleBtnActive]}
+                                onPress={() => setViewMode('GANTT')}
+                            >
+                                <GanttChart size={16} color={viewMode === 'GANTT' ? theme.colors.primary : '#A0AEC0'} />
+                            </TouchableOpacity>
+                        </View>
+
                         <TouchableOpacity style={styles.iconBtn} onPress={() => handleExport('json')}>
                             <FileText size={20} color={theme.colors.primary} />
                         </TouchableOpacity>
@@ -85,17 +103,21 @@ export default function TimelineScreen() {
                 )}
             </View>
 
-            <FlatList
-                data={logs}
-                keyExtractor={item => item.id}
-                renderItem={renderItem}
-                contentContainerStyle={styles.list}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No recent activity</Text>
-                    </View>
-                }
-            />
+            {viewMode === 'LOG' ? (
+                <FlatList
+                    data={logs}
+                    keyExtractor={item => item.id}
+                    renderItem={renderItem}
+                    contentContainerStyle={styles.list}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>No recent activity</Text>
+                        </View>
+                    }
+                />
+            ) : (
+                <TimelineGantt rooms={rooms} />
+            )}
         </SafeAreaView>
     );
 }
@@ -121,7 +143,8 @@ const styles = StyleSheet.create({
     },
     exportButtons: {
         flexDirection: 'row',
-        gap: 12,
+        alignItems: 'center',
+        gap: 8,
     },
     iconBtn: {
         padding: 8,
@@ -161,5 +184,17 @@ const styles = StyleSheet.create({
     },
     emptyText: {
         color: theme.colors.textSecondary,
+    },
+    toggleBtn: {
+        padding: 6,
+        borderRadius: 6
+    },
+    toggleBtnActive: {
+        backgroundColor: 'white',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+        elevation: 1
     }
 });

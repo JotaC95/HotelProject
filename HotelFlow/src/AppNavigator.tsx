@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import * as Notifications from 'expo-notifications';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,8 +16,10 @@ import TimelineScreen from './screens/TimelineScreen';
 import MaintenanceScreen from './screens/MaintenanceScreen'; // Phase 19
 import ReceptionScreen from './screens/ReceptionScreen'; // Phase 19
 import HousemanScreen from './screens/HousemanScreen'; // Phase 27
+import SupervisorScreen from './screens/SupervisorScreen'; // Phase 2
 import AdminScreen from './screens/AdminScreen'; // Phase 27
-// import SettingsScreen from './screens/SettingsScreen';
+import LostFoundScreen from './screens/LostFoundScreen'; // New Import
+import { AnalyticsScreen } from './screens/AnalyticsScreen';
 
 // Stack Types
 export type RootStackParamList = {
@@ -25,7 +28,11 @@ export type RootStackParamList = {
     Maintenance: undefined;
     Reception: undefined;
     Houseman: undefined;
+    Supervisor: undefined;
     Admin: undefined;
+    RoomDetail: { roomId: string };
+    LostFound: undefined;
+    Analytics: undefined;
 };
 
 export type MainTabParamList = {
@@ -115,12 +122,21 @@ function MainNavigator() {
     );
 }
 
+
+
 export const AppNavigator = () => {
     const { user, isLoading } = useAuth();
 
+    useEffect(() => {
+        const subscription = Notifications.addNotificationReceivedListener(notification => {
+            console.log("Notification Received:", notification);
+        });
+        return () => subscription.remove();
+    }, []);
+
     if (isLoading) {
         // Return Loading Splash ideally
-        return null;
+        return null; // The User Experience plan includes replacing this later if needed, but for now skeleton is inside RoomList
     }
 
     return (
@@ -130,17 +146,25 @@ export const AppNavigator = () => {
                     <Stack.Screen name="Login" component={LoginScreen} />
                 ) : (
                     // Role-Based Routing
-                    user.role === 'MAINTENANCE' ? (
-                        <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
-                    ) : user.role === 'RECEPTION' ? (
-                        <Stack.Screen name="Reception" component={ReceptionScreen} />
-                    ) : user.role === 'HOUSEMAN' ? (
-                        <Stack.Screen name="Houseman" component={HousemanScreen} />
-                    ) : user.role === 'ADMIN' ? (
-                        <Stack.Screen name="Admin" component={AdminScreen} />
-                    ) : (
-                        <Stack.Screen name="Main" component={MainNavigator} />
-                    )
+                    <>
+                        {user.role === 'MAINTENANCE' ? (
+                            <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
+                        ) : user.role === 'RECEPTION' ? (
+                            <Stack.Screen name="Reception" component={ReceptionScreen} />
+                        ) : user.role === 'HOUSEMAN' ? (
+                            <Stack.Screen name="Houseman" component={HousemanScreen} />
+                        ) : user.role === 'SUPERVISOR' ? (
+                            <Stack.Screen name="Supervisor" component={SupervisorScreen} />
+                        ) : user.role === 'ADMIN' ? (
+                            <Stack.Screen name="Admin" component={AdminScreen} />
+                        ) : (
+                            <Stack.Screen name="Main" component={MainNavigator} />
+                        )}
+                        <Stack.Screen name="RoomDetail" component={RoomDetailScreen} options={{ headerShown: true, title: 'Room Details' }} />
+                        {/* Enhanced Features */}
+                        <Stack.Screen name="LostFound" component={LostFoundScreen} options={{ presentation: 'modal' }} />
+                        <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ headerShown: true, title: 'Analytics Dashboard' }} />
+                    </>
                 )}
             </Stack.Navigator>
         </NavigationContainer>

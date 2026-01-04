@@ -4,15 +4,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { useHotel, Room, Staff } from '../contexts/HotelContext';
 import { theme } from '../utils/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Users, BedDouble, Package, LogOut, Plus, Trash2, Edit2, AlertCircle, Clock } from 'lucide-react-native';
+import { Users, BedDouble, Package, LogOut, Plus, Trash2, Edit2, AlertCircle, Clock, Bell } from 'lucide-react-native';
 import api from '../services/api';
+import { NotificationsModal } from '../components/NotificationsModal';
 
 type AdminTab = 'USERS' | 'ROOMS' | 'INVENTORY' | 'CLEANING';
 
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../AppNavigator';
+
 export default function AdminScreen() {
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const { logout, user } = useAuth();
     const {
-        staff, rooms, inventory, cleaningTypes,
+        staff, rooms, inventory, cleaningTypes, announcements,
         addStaff, updateStaff, deleteStaff,
         createRoom, deleteRoom,
         addInventoryItem, deleteInventoryItem, updateInventoryQuantity,
@@ -21,6 +27,7 @@ export default function AdminScreen() {
         fetchStaff, fetchRooms, fetchInventory, fetchCleaningTypes
     } = useHotel();
     const [activeTab, setActiveTab] = useState<AdminTab>('USERS');
+    const [notificationsVisible, setNotificationsVisible] = useState(false);
 
     // Modal States
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -228,14 +235,20 @@ export default function AdminScreen() {
                                 </View>
                             )}
                         </View>
-                        <TouchableOpacity onPress={() => {
-                            Alert.alert("Delete Room", `Delete Room ${item.number}?`, [
-                                { text: "Cancel" },
-                                { text: "Delete", style: 'destructive', onPress: () => deleteRoom(item.id) }
-                            ]);
-                        }} style={{ paddingLeft: 10 }}>
-                            <Trash2 size={20} color={theme.colors.error} />
-                        </TouchableOpacity>
+                        <View style={{ gap: 10 }}>
+                            <TouchableOpacity onPress={() => navigation.navigate('RoomDetail', { roomId: item.id })} style={{ padding: 8 }}>
+                                <Edit2 size={20} color={theme.colors.primary} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => {
+                                Alert.alert("Delete Room", `Delete Room ${item.number}?`, [
+                                    { text: "Cancel" },
+                                    { text: "Delete", style: 'destructive', onPress: () => deleteRoom(item.id) }
+                                ]);
+                            }} style={{ padding: 8 }}>
+                                <Trash2 size={20} color={theme.colors.error} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             />
@@ -305,9 +318,17 @@ export default function AdminScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Administrator</Text>
-                <TouchableOpacity onPress={logout}>
-                    <LogOut color={theme.colors.error} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 15 }}>
+                    <TouchableOpacity onPress={() => setNotificationsVisible(true)}>
+                        <View>
+                            <Bell size={24} color={theme.colors.primary} />
+                            {announcements.length > 0 && <View style={styles.badgeDot} />}
+                        </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={logout}>
+                        <LogOut color={theme.colors.error} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {renderTabs()}
@@ -460,6 +481,11 @@ export default function AdminScreen() {
                 </View>
             </Modal>
 
+            <NotificationsModal
+                visible={notificationsVisible}
+                onClose={() => setNotificationsVisible(false)}
+            />
+
         </SafeAreaView >
     );
 }
@@ -498,4 +524,15 @@ const styles = StyleSheet.create({
     countBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EDF2F7', alignItems: 'center', justifyContent: 'center' },
     countBtnText: { fontSize: 18, fontWeight: 'bold' },
     countValue: { fontSize: 16, fontWeight: 'bold', minWidth: 24, textAlign: 'center' },
+    badgeDot: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: 'red',
+        borderWidth: 1,
+        borderColor: 'white'
+    }
 });

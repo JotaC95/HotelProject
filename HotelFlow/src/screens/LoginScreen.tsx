@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,59 +22,63 @@ const LoginScreen = () => {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <View style={styles.logoContainer}>
-                    <View style={styles.iconCircle}>
-                        <KeyRound color="white" size={32} />
-                    </View>
-                    <Text style={styles.title}>HotelFlow</Text>
-                    <Text style={styles.subtitle}>Premium Housekeeping Management</Text>
-                </View>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                        <View style={styles.logoContainer}>
+                            <View style={styles.iconCircle}>
+                                <KeyRound color="white" size={32} />
+                            </View>
+                            <Text style={styles.title}>HotelFlow</Text>
+                            <Text style={styles.subtitle}>Premium Housekeeping Management</Text>
+                        </View>
 
-                <View style={styles.formContainer}>
-                    <Text style={styles.label}>Sign in to your account</Text>
+                        <View style={styles.formContainer}>
+                            <Text style={styles.label}>Sign in to your account</Text>
 
-                    <View style={styles.inputWrapper}>
-                        <User color={theme.colors.textSecondary} size={20} style={styles.inputIcon} />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Username"
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={username}
-                            onChangeText={setUsername}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                    </View>
+                            <View style={styles.inputWrapper}>
+                                <User color={theme.colors.textSecondary} size={20} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Username"
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={username}
+                                    onChangeText={setUsername}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            </View>
 
-                    <View style={styles.inputWrapper}>
-                        <Lock color={theme.colors.textSecondary} size={20} style={styles.inputIcon} />
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Password"
-                            placeholderTextColor={theme.colors.textSecondary}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                            autoCapitalize="none"
-                        />
-                    </View>
+                            <View style={styles.inputWrapper}>
+                                <Lock color={theme.colors.textSecondary} size={20} style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor={theme.colors.textSecondary}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                    autoCapitalize="none"
+                                />
+                            </View>
 
-                    <TouchableOpacity
-                        style={[styles.button, (!username.trim() || isLoading) && styles.buttonDisabled]}
-                        onPress={handleLogin}
-                        disabled={!username.trim() || isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <Text style={styles.buttonText}>Continue</Text>
-                        )}
-                    </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, (!username.trim() || isLoading) && styles.buttonDisabled]}
+                                onPress={handleLogin}
+                                disabled={!username.trim() || isLoading}
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Continue</Text>
+                                )}
+                            </TouchableOpacity>
 
-                    <View style={styles.hintContainer}>
-                        <Text style={styles.hintText}>Enter credentials from Django Admin</Text>
-                    </View>
-                </View>
+                            <View style={styles.hintContainer}>
+                                <Text style={styles.hintText}>Enter credentials from Django Admin</Text>
+                            </View>
+                        </View>
+                    </ScrollView>
+                </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -87,6 +91,9 @@ const styles = StyleSheet.create({
     },
     keyboardView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
         justifyContent: 'center',
         padding: theme.spacing.l,
     },
@@ -144,6 +151,7 @@ const styles = StyleSheet.create({
         padding: theme.spacing.m,
         fontSize: 16,
         color: theme.colors.text,
+        height: 50, // Explicit height
     },
     button: {
         backgroundColor: theme.colors.primary,

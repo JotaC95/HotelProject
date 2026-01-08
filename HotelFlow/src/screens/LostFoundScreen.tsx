@@ -27,7 +27,7 @@ export default function LostFoundScreen() {
             `Are you sure you want to mark "${item.description}" as ${newStatus}?`,
             [
                 { text: "Cancel", style: "cancel" },
-                { text: "Confirm", onPress: () => updateLostItemStatus(item.id, newStatus) }
+                { text: "Confirm", onPress: () => updateLostItemStatus(String(item.id), newStatus) }
             ]
         );
     };

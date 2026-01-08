@@ -1,0 +1,6 @@
+/Users/jota1/.gemini/antigravity/scratch/HotelBackend/venv/lib/python3.14/site-packages/django/db/models/base.py:388: RuntimeWarning: Model 'housekeeping.room' was already registered. Reloading models is not advised as it can lead to inconsistencies, most notably with related models.
+  new_class._meta.apps.register_model(new_class._meta.app_label, new_class)
+/Users/jota1/.gemini/antigravity/scratch/HotelBackend/venv/lib/python3.14/site-packages/django/db/models/base.py:388: RuntimeWarning: Model 'housekeeping.room' was already registered. Reloading models is not advised as it can lead to inconsistencies, most notably with related models.
+  new_class._meta.apps.register_model(new_class._meta.app_label, new_class)
+Watching for file changes with StatReloader
+Error: That port is already in use.

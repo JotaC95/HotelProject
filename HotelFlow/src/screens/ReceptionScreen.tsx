@@ -4,7 +4,7 @@ import { useHotel, Room, Staff, CleaningType } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { RoomCard } from '../components/RoomCard';
-import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase, Bell } from 'lucide-react-native';
+import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase, Bell, Calendar } from 'lucide-react-native';
 import { NotificationsModal } from '../components/NotificationsModal';
 
 import { useNavigation } from '@react-navigation/native';
@@ -49,12 +49,66 @@ export default function ReceptionScreen() {
 
     const handleMoveGuest = async () => {
         if (moveFromId && moveToId) {
-            await moveGuest(moveFromId, moveToId);
-            setMoveModalVisible(false);
-            setMoveFromId(null);
-            setMoveToId(null);
+            const sourceRoom = rooms.find(r => r.id === moveFromId);
+            const targetRoom = rooms.find(r => r.id === moveToId);
+
+            if (!sourceRoom || !targetRoom) return;
+
+            // Check Configuration Mismatch
+            const sourceConfig = JSON.stringify(sourceRoom.configuration);
+            const targetConfig = JSON.stringify(targetRoom.configuration);
+            // Note: simple stringify comparison, ideally check specific fields like 'beds'
+
+            // Better config check:
+            const bedsDiffer = sourceRoom.configuration?.beds !== targetRoom.configuration?.beds;
+            const roomsDiffer = sourceRoom.configuration?.bedrooms !== targetRoom.configuration?.bedrooms;
+
+            if (bedsDiffer || roomsDiffer) {
+                Alert.alert(
+                    "Configuration Mismatch",
+                    `Target room has different setup.\nSource: ${sourceRoom.configuration?.beds || 'N/A'}\nTarget: ${targetRoom.configuration?.beds || 'N/A'}\n\nUpdate target to match source?`,
+                    [
+                        {
+                            text: "No, Keep Target Config",
+                            onPress: async () => {
+                                await moveGuest(moveFromId, moveToId, false);
+                                closeMoveModal();
+                            }
+                        },
+                        {
+                            text: "Yes, Update Config",
+                            onPress: async () => {
+                                await moveGuest(moveFromId, moveToId, true);
+                                closeMoveModal();
+                            }
+                        }
+                    ]
+                );
+            } else {
+                // Same config, just move
+                await moveGuest(moveFromId, moveToId, false);
+                closeMoveModal();
+            }
         }
     };
+
+    const closeMoveModal = () => {
+        setMoveModalVisible(false);
+        setMoveFromId(null);
+        setMoveToId(null);
+    }
+
+    // Filter compatible rooms logic
+    const getSourceType = () => {
+        if (!moveFromId) return null;
+        return rooms.find(r => r.id === moveFromId)?.type;
+    };
+
+    const compatibleRooms = rooms.filter(r =>
+        !r.guestDetails?.currentGuest &&
+        (r.status === 'COMPLETED' || r.status === 'INSPECTION') &&
+        (!getSourceType() || r.type === getSourceType()) // Strict Type Match as per plan
+    );
 
 
     // Get unique existing groups
@@ -408,6 +462,13 @@ export default function ReceptionScreen() {
                     <Text style={[styles.navTabText, activeTab === 'ROOMS' && styles.navTextActive]}>Rooms</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                    style={styles.navTab}
+                    onPress={() => navigation.navigate('Roster')}
+                >
+                    <Calendar size={18} color={'#A0AEC0'} />
+                    <Text style={styles.navTabText}>Roster</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                     style={[styles.navTab, activeTab === 'REQUESTS' && styles.navTabActive]}
                     onPress={() => setActiveTab('REQUESTS')}
                 >
@@ -646,14 +707,14 @@ export default function ReceptionScreen() {
 
                         <Text style={styles.label}>Move To (Vacant/Clean)</Text>
                         <ScrollView style={{ maxHeight: 150, marginBottom: 15 }}>
-                            {rooms.filter(r => !r.guestDetails?.currentGuest && (r.status === 'COMPLETED' || r.status === 'INSPECTION')).map(r => (
+                            {compatibleRooms.map(r => (
                                 <TouchableOpacity
                                     key={r.id}
                                     style={[styles.typeOption, moveToId === r.id && styles.typeActive, { marginBottom: 6 }]}
                                     onPress={() => setMoveToId(r.id)}
                                 >
                                     <Text style={[styles.typeText, moveToId === r.id && { color: 'white' }]}>
-                                        {r.number} ({r.type})
+                                        {r.number} ({r.type}) - {r.configuration?.beds || 'Std'}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
@@ -697,32 +758,68 @@ const styles = StyleSheet.create({
     navTextActive: { color: theme.colors.primary },
 
     content: { flex: 1, padding: 16 },
-    statsContainer: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-    statCard: { flex: 1, backgroundColor: 'white', padding: 16, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-    iconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-    statNumber: { fontSize: 24, fontWeight: 'bold', color: '#2D3748' },
-    statLabel: { fontSize: 12, color: '#718096', fontWeight: '500' },
+    statsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 }, // Added wrap
+    statCard: {
+        minWidth: '30%',
+        flex: 1,
+        backgroundColor: theme.colors.card, // Use theme
+        padding: 16,
+        borderRadius: 16, // More premium radius
+        alignItems: 'center',
+        shadowColor: theme.colors.shadow,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4
+    },
+    iconBox: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }, // Larger icon box
+    statNumber: { fontSize: 24, fontWeight: '800', color: theme.colors.text },
+    statLabel: { fontSize: 13, color: theme.colors.textSecondary, fontWeight: '600', marginTop: 4 },
 
     sectionHeader: { marginBottom: 12 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D3748' },
-    sectionSubtitle: { fontSize: 14, color: '#718096', marginBottom: 16 },
-    emptyText: { color: '#A0AEC0', fontStyle: 'italic' },
+    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text }, // Larger title
+    sectionSubtitle: { fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16 },
+    emptyText: { color: theme.colors.textSecondary, fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
 
-    simpleRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: 'white', borderRadius: 8, marginBottom: 8, alignItems: 'center' },
-    rowText: { fontSize: 16, fontWeight: '600', color: '#2D3748' },
-    vipBadge: { backgroundColor: '#D69E2E', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+    simpleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 16,
+        backgroundColor: theme.colors.card,
+        borderRadius: 12,
+        marginBottom: 8,
+        alignItems: 'center',
+        shadowColor: theme.colors.shadow,
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2
+    },
+    rowText: { fontSize: 16, fontWeight: '600', color: theme.colors.text },
+    vipBadge: { backgroundColor: '#D69E2E', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
     vipText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
 
     // Staff Styles
-    staffCard: { flexDirection: 'row', backgroundColor: 'white', padding: 16, borderRadius: 12, alignItems: 'center', gap: 12, marginBottom: 12 },
-    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
-    avatarText: { fontSize: 18, fontWeight: 'bold', color: '#4A5568' },
-    staffName: { fontSize: 16, fontWeight: 'bold', color: '#2D3748' },
-    staffRole: { fontSize: 12, color: '#718096' },
-    groupBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-    groupActive: { backgroundColor: theme.colors.primary + '20' },
-    groupInactive: { backgroundColor: '#EDF2F7' },
-    groupText: { fontSize: 12, fontWeight: '600', color: theme.colors.primary },
+    staffCard: {
+        flexDirection: 'row',
+        backgroundColor: theme.colors.card,
+        padding: 16,
+        borderRadius: 16,
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 12,
+        shadowColor: theme.colors.shadow,
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2
+    },
+    avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textSecondary },
+    staffName: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
+    staffRole: { fontSize: 12, color: theme.colors.textSecondary },
+    groupBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    groupActive: { backgroundColor: theme.colors.primary + '15' }, // Soft primary
+    groupInactive: { backgroundColor: theme.colors.background },
+    groupText: { fontSize: 12, fontWeight: '700', color: theme.colors.primary },
 
     // Room Edit Styles
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

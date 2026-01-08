@@ -3,6 +3,13 @@ from .models import Room, Incident, InventoryItem, CleaningTypeDefinition, LostI
 from .serializers import RoomSerializer, IncidentSerializer, InventoryItemSerializer, CleaningTypeDefinitionSerializer, LostItemSerializer, AnnouncementSerializer, AssetSerializer
 from accounts.models import CustomUser
 from .utils import send_multicast_push
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .utils import send_multicast_push
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import CleaningSession
+from .serializers import CleaningSessionSerializer
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().order_by('name')
@@ -45,6 +52,52 @@ class RoomViewSet(viewsets.ModelViewSet):
         
         send_multicast_push(targets, title, body, extra={"type": "ROOM_UPDATE"})
 
+    @action(detail=True, methods=['post'])
+    def move_guest(self, request, pk=None):
+        source_room = self.get_object()
+        target_room_id = request.data.get('target_room_id')
+        update_config = request.data.get('update_config', False)
+        
+        if not target_room_id:
+             return Response({'error': 'target_room_id required'}, status=400)
+             
+        try:
+            target_room = Room.objects.get(id=target_room_id)
+        except Room.DoesNotExist:
+             return Response({'error': 'Target room not found'}, status=404)
+             
+        if target_room.guest_status != 'NO_GUEST':
+             return Response({'error': 'Target room is not vacant'}, status=400)
+             
+        # Transfer Guest Details
+        target_room.current_guest_name = source_room.current_guest_name
+        target_room.check_in_date = source_room.check_in_date
+        target_room.check_out_date = source_room.check_out_date
+        target_room.guest_count = source_room.guest_count
+        target_room.guest_status = source_room.guest_status
+        
+        # Determine Status
+        target_room.status = 'COMPLETED' # Guests moved to clean room usually
+        
+        # Optional: Copy Configuration
+        if update_config:
+            target_room.bed_setup = source_room.bed_setup
+            target_room.extras_text = source_room.extras_text
+            target_room.bedroom_count = source_room.bedroom_count
+
+        target_room.save()
+        
+        # Clear Source Room
+        source_room.current_guest_name = None
+        source_room.check_in_date = None
+        source_room.check_out_date = None
+        source_room.guest_count = 1
+        source_room.guest_status = 'NO_GUEST'
+        source_room.status = 'PENDING' # Needs cleaning now
+        source_room.save()
+        
+        return Response({'message': f'Guest moved from {source_room.number} to {target_room.number}'})
+
 class CleaningTypeDefinitionViewSet(viewsets.ModelViewSet):
     queryset = CleaningTypeDefinition.objects.all().order_by('name')
     serializer_class = CleaningTypeDefinitionSerializer
@@ -62,11 +115,6 @@ class IncidentViewSet(viewsets.ModelViewSet):
         if incident.target_role:
             targets = CustomUser.objects.filter(role=incident.target_role)
             send_multicast_push(targets, "New Incident", f"{incident.text} ({incident.room_number if hasattr(incident, 'room_number') else 'General'})", extra={"type": "INCIDENT", "id": incident.id})
-
-from .models import CleaningSession
-from .serializers import CleaningSessionSerializer
-from rest_framework.response import Response
-from rest_framework.decorators import action
 
 class CleaningSessionViewSet(viewsets.ModelViewSet):
     queryset = CleaningSession.objects.all()

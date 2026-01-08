@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Switch, TextInput } from 'react-native';
 import { useHotel } from '../contexts/HotelContext';
 import { CheckCircle2, XCircle } from 'lucide-react-native';
 
@@ -16,6 +16,7 @@ const CHECKLIST_ITEMS = [
 export const InspectionModal = ({ roomId, visible, onClose }: { roomId: string, visible: boolean, onClose: () => void }) => {
     const { submitInspection, updateRoomStatus, addSystemIncident } = useHotel();
     const [checks, setChecks] = useState<Record<string, boolean>>({});
+    const [comment, setComment] = useState('');
 
     const toggleCheck = (id: string) => {
         setChecks(prev => ({ ...prev, [id]: !prev[id] }));
@@ -25,7 +26,8 @@ export const InspectionModal = ({ roomId, visible, onClose }: { roomId: string, 
         const report = {
             timestamp: new Date().toISOString(),
             checks: checks,
-            result: 'PASSED'
+            result: 'PASSED',
+            comment: comment
         };
         await submitInspection(roomId, report);
         onClose();
@@ -35,7 +37,7 @@ export const InspectionModal = ({ roomId, visible, onClose }: { roomId: string, 
         // Fail Logic: Mark as PENDING (Needs recleaning)
         await updateRoomStatus(roomId, 'PENDING');
         // Notify Cleaner?
-        addSystemIncident(`Room ${roomId} FAILED inspection. Needs recleaning.`, 'SUPERVISOR');
+        addSystemIncident(`Room ${roomId} FAILED inspection. ${comment ? `Note: ${comment}` : 'Needs recleaning.'}`, 'SUPERVISOR');
         onClose();
     };
 
@@ -53,6 +55,16 @@ export const InspectionModal = ({ roomId, visible, onClose }: { roomId: string, 
                                 <Switch value={!!checks[item.id]} onValueChange={() => toggleCheck(item.id)} />
                             </TouchableOpacity>
                         ))}
+                        <View style={styles.commentSection}>
+                            <Text style={styles.commentLabel}>Comments / Issues:</Text>
+                            <TextInput
+                                style={styles.commentInput}
+                                placeholder="Add notes (e.g., 'Mirror smudged')"
+                                value={comment}
+                                onChangeText={setComment}
+                                multiline
+                            />
+                        </View>
                     </ScrollView>
 
                     <View style={styles.actions}>
@@ -87,6 +99,9 @@ const styles = StyleSheet.create({
     list: { marginBottom: 20 },
     item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderColor: '#EEE' },
     label: { fontSize: 16 },
+    commentSection: { marginTop: 20 },
+    commentLabel: { fontSize: 14, color: '#666', marginBottom: 8 },
+    commentInput: { borderWidth: 1, borderColor: '#DDD', borderRadius: 8, padding: 10, height: 80, textAlignVertical: 'top' },
     actions: { flexDirection: 'row', gap: 15 },
     btn: { flex: 1, padding: 15, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
     failBtn: { backgroundColor: '#F44336' },

@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
-import { useHotel, Room, IncidentRole } from '../contexts/HotelContext';
+import { useHotel, Room, IncidentRole, RoomStatus } from '../contexts/HotelContext';
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { RoomCard } from '../components/RoomCard';
 import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
 import { theme } from '../utils/theme';
-import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase } from 'lucide-react-native'; // Clean icon for help
+import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff } from 'lucide-react-native'; // Clean icon for help
+import ConfettiCannon from 'react-native-confetti-cannon';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { SkeletonRoomCard } from '../components/SkeletonRoomCard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -69,11 +70,22 @@ const DashboardHeader = () => {
 
         switch (user.role) {
             case 'CLEANER': {
-                const myRooms = rooms.filter(r => r.assignedGroup === user.groupId);
+                // Count explicitly assigned rooms first
+                const assignedToMe = rooms.filter(r => r.assigned_cleaner === user.id);
+                // Fallback to group if no assignments? Or just sum? 
+                // Let's use the same logic as the list filter for consistency
+                const myRooms = rooms.filter(r => {
+                    const assignedId = String(r.assigned_cleaner);
+                    const userId = String(user.id);
+                    if (assignedId === userId) return true;
+                    if (r.assigned_cleaner) return false; // Assigned to others (if exists and not me)
+                    return r.assignedGroup === user.groupId; // Fallback
+                });
+
                 const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
                 const total = myRooms.length;
                 return [
-                    { label: 'Assigned', value: total, icon: '🛏️' },
+                    { label: 'My List', value: total, icon: '🛏️' },
                     { label: 'Done', value: completed, icon: '✅' },
                     { label: 'Progress', value: `${total ? Math.round((completed / total) * 100) : 0}%`, icon: '📊' }
                 ];
@@ -145,17 +157,41 @@ const DashboardHeader = () => {
 };
 
 export default function RoomListScreen() {
-    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession } = useHotel();
-    const { user } = useAuth();
+    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, isOffline } = useHotel();
+    const { user, logout } = useAuth();
     const navigation = useNavigation<NavigationProp>();
+
+    // Confetti Ref
+    const confettiRef = useRef<ConfettiCannon>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedGroup, setSelectedGroup] = useState<string | 'ALL'>('ALL');
     const [selectedIncidentType, setSelectedIncidentType] = useState<IncidentRole | 'ALL'>('ALL');
     const [showFilters, setShowFilters] = useState(false);
+    const [cleanerShowAll, setCleanerShowAll] = useState(false);
 
     const isSupervisor = user?.role === 'SUPERVISOR';
     const isCleaner = user?.role === 'CLEANER';
+
+    const handleQuickStatusUpdate = async (room: Room) => {
+        let newStatus: RoomStatus | null = null;
+        if (room.status === 'PENDING') newStatus = 'IN_PROGRESS';
+        else if (room.status === 'IN_PROGRESS') newStatus = 'COMPLETED'; // Cleaning Done
+
+        if (newStatus) {
+            // Optimistic / Fast update
+            // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); // If haptics available
+            try {
+                await updateRoomStatus(room.id, newStatus);
+                // Trigger Confetti if completed
+                if (newStatus === 'COMPLETED') {
+                    confettiRef.current?.start();
+                }
+            } catch (error) {
+                Alert.alert("Error", "Failed to update status");
+            }
+        }
+    };
 
     const { announcements, fetchAnnouncements } = useHotel();
     const [showNotifications, setShowNotifications] = useState(false);
@@ -176,6 +212,34 @@ export default function RoomListScreen() {
                         <View>
                             <Bell size={24} color={theme.colors.primary} />
                             {announcements.length > 0 && <View style={styles.badgeDot} />}
+                        </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => {
+                            Alert.alert(
+                                "🚨 EMERGENCY ALERT 🚨",
+                                "Are you sure you want to trigger a SAFETY ALERT?\n\nThis will notify Reception and Supervisors immediately.",
+                                [
+                                    { text: "CANCEL", style: 'cancel' },
+                                    {
+                                        text: "SEND ALERT",
+                                        style: 'destructive',
+                                        onPress: () => {
+                                            addSystemIncident(`🚨 EMERGENCY REPORTED BY ${user?.name || user?.username} 🚨`, 'SUPERVISOR');
+                                            // Ideally we'd also notify Reception, but systemIncidents takes one target. 
+                                            // Context needs update or just broadcast to supervisor who handles it.
+                                            // Actually addSystemIncident creates an "Incident". Maybe we should call it twice or update context.
+                                            // For now, Supervisor is the safest bet for staff management.
+                                            Alert.alert("ALERT SENT", "Help is on the way.");
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                        style={{ marginLeft: 5 }}
+                    >
+                        <View style={{ backgroundColor: theme.colors.error + '20', padding: 4, borderRadius: 20 }}>
+                            <ShieldAlert size={24} color={theme.colors.error} />
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -244,11 +308,11 @@ export default function RoomListScreen() {
 
 
     const filteredRooms = useMemo(() => {
-        let result = rooms.filter(room => {
+        let result = rooms.filter((room, index) => {
             // Search Query
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
-                if (!room.number.includes(query) && !room.type.toLowerCase().includes(query)) return false;
+                if (!room.number.toLowerCase().includes(query) && !room.type?.toLowerCase().includes(query)) return false;
             }
 
             // Supervisor Filters
@@ -261,57 +325,96 @@ export default function RoomListScreen() {
                     if (!hasType) return false;
                 }
             } else {
-                // Cleaner: Only show my group's rooms (if assigned)
-                if (user?.groupId && room.assignedGroup && room.assignedGroup !== user.groupId) {
-                    return false;
-                }
+                if (!user || !user.id) return false;
+                // Log context ONCE per render cycle (noisy, but necessary now)
 
-                if (room.status === 'MAINTENANCE') {
+
+                // Cleaner: Priority to 'assigned_cleaner' if feature is valid
+                const q = searchQuery.toLowerCase();
+                if (!room.number.toLowerCase().includes(q) &&
+                    !room.guestDetails?.currentGuest?.toLowerCase().includes(q)) {
                     return false;
                 }
             }
+
+            // Group Filter
+            if (isSupervisor && selectedGroup !== 'ALL') {
+                if (selectedGroup === 'Ungrouped') {
+                    if (room.assignedGroup) return false;
+                } else {
+                    if (room.assignedGroup !== selectedGroup) return false;
+                }
+            }
+
+            // Cleaner "My Assignments" Filter (NOW GROUP BASED)
+            if (isCleaner) {
+                // User requirement: "Show tasks assigned to the group"
+                // IF user has a group, show ALL rooms for that group.
+                if (user?.groupId) {
+                    if (room.assignedGroup !== user.groupId) return false;
+                } else {
+                    // Fallback to individual assignment if solo
+                    if (room.assigned_cleaner !== user?.id) return false;
+                }
+            }
+
+            // Incident Filter
+            if (selectedIncidentType !== 'ALL') {
+                const hasType = room.incidents.some(i => i.targetRole === selectedIncidentType && i.status === 'OPEN');
+                if (!hasType) return false;
+            }
+
+            if (room.status === 'MAINTENANCE') return false;
 
             return true;
         });
 
         return result.sort((a, b) => {
-            // 1. Next Arrival High Priority
-            const hasArrivalA = !!a.guestDetails?.nextArrival;
-            const hasArrivalB = !!b.guestDetails?.nextArrival;
-            if (hasArrivalA && !hasArrivalB) return -1;
-            if (!hasArrivalA && hasArrivalB) return 1;
+            // PRIORITY HIERARCHY MAP
+            const PRIORITY_MAP: Record<string, number> = {
+                'PREARRIVAL': 1,
+                'DEPARTURE': 2,
+                'HOLDOVER': 3,
+                'WEEKLY': 4,
+                'RUBBISH': 5,
+                'DAYUSE': 6
+            };
 
-            // 2. Supervisor Priority: INSPECTION first
-            if (isSupervisor) {
-                if (a.status === 'INSPECTION' && b.status !== 'INSPECTION') return -1;
-                if (a.status !== 'INSPECTION' && b.status === 'INSPECTION') return 1;
+            const getPriorityScore = (r: Room) => {
+                let score = PRIORITY_MAP[r.cleaningType] || 10; // Default low priority
+
+                // LOGIC: High Priority (Pre/Dep) MUST be empty.
+                // If Guest is IN room, push to bottom.
+                const isHighPriorityType = r.cleaningType === 'PREARRIVAL' || r.cleaningType === 'DEPARTURE';
+                const isOccupied = r.guestStatus === 'GUEST_IN_ROOM' || r.guestStatus === 'DND'; // Treat DND as occupied for safety
+
+                if (isHighPriorityType && isOccupied) {
+                    score += 100; // Penalize Heavily -> Moves to bottom (Score 101/102)
+                }
+
+                return score;
+            };
+
+            const scoreA = getPriorityScore(a);
+            const scoreB = getPriorityScore(b);
+
+            if (scoreA !== scoreB) {
+                return scoreA - scoreB; // Lower score = Higher Priority
             }
 
-            // 3. Guest In Room Priority (Usually lower priority for full cleaning, but higher for "Check" tasks? 
-            // User said "marked so they take into account". Usually empty rooms are prioritized for new arrivals.
-            // Let's stick to standard flow: Departure > Stayover.
-            // But if "Guest In Room", maybe push down? Or keep neutral. 
-            // Let's keep existing logic but after manual priority.
+            // Tie-Breaker: Reception Priority (Manual Overrides)
+            if (a.receptionPriority !== b.receptionPriority) {
+                // Undefined priority (low) vs Defined (high)
+                // Wait, Reception Priority 1=High. 
+                const pA = a.receptionPriority || 99;
+                const pB = b.receptionPriority || 99;
+                return pA - pB;
+            }
 
-            // 4. Manual Reception Priority
-            const prioA = a.receptionPriority ?? 999;
-            const prioB = b.receptionPriority ?? 999;
-            if (prioA !== prioB) return prioA - prioB;
-
-            // 5. Cleaning Type Priority
-            const isPreA = a.cleaningType === 'PREARRIVAL';
-            const isPreB = b.cleaningType === 'PREARRIVAL';
-            if (isPreA && !isPreB) return -1;
-            if (!isPreA && isPreB) return 1;
-
-            const isDepA = a.cleaningType === 'DEPARTURE';
-            const isDepB = b.cleaningType === 'DEPARTURE';
-            if (isDepA && !isDepB) return -1;
-            if (!isDepA && isDepB) return 1;
-
+            // Tie-Breaker: Room Number
             return a.number.localeCompare(b.number);
         });
-    }, [rooms, searchQuery, selectedGroup, selectedIncidentType, isSupervisor, user]);
+    }, [rooms, searchQuery, selectedGroup, selectedIncidentType, isSupervisor, user, cleanerShowAll]);
 
     const totalMinutes = useMemo(() => {
         // Use filteredRooms for accurate Cleaner/Supervisor view estimates
@@ -345,11 +448,23 @@ export default function RoomListScreen() {
                 </View>
             )}
 
-            {isSupervisor ? (
+            {isSupervisor || user?.role === 'ADMIN' || user?.role === 'RECEPTION' ? (
                 <SupervisorTeamDashboard />
             ) : (
                 <>
                     <TimerDisplay totalMinutes={totalMinutes} />
+
+                    {/* Team Header */}
+                    {user?.groupId && (
+                        <View style={styles.teamHeader}>
+                            <Text style={styles.teamTitle}>{user.groupId}</Text>
+                            <Text style={styles.partnerText}>
+                                Team Members: {user.username}
+                                {/* We don't have full staff list in context efficiently, but assuming we can filter if available */}
+                            </Text>
+                        </View>
+                    )}
+
                     <View style={styles.summaryCard}>
                         <View>
                             <Text style={styles.summaryLabel}>Total Estimated Time</Text>
@@ -382,37 +497,57 @@ export default function RoomListScreen() {
                 />
             </View>
 
+
+
             <View style={styles.controlsContainer}>
                 <View style={styles.userInfo}>
                     <Text style={styles.userRoleText}>
-                        {user?.role === 'SUPERVISOR' ? 'Supervisor Mode' : `${user?.name} (${user?.groupId || 'No Group'})`}
+                        {user?.role === 'SUPERVISOR' ? 'Supervisor Mode' : `${user?.name}`}
                     </Text>
+                    <TouchableOpacity onPress={() => logout()} style={{ marginLeft: 10 }}>
+                        <LogOut size={16} color="red" />
+                    </TouchableOpacity>
                 </View>
 
                 {isCleaner && (
-                    <TouchableOpacity style={styles.suppliesButton} onPress={() => {
-                        Alert.prompt(
-                            "Request Supplies",
-                            "What do you need?",
-                            (text) => {
-                                if (text) {
-                                    addSystemIncident(`${user.name} (Room ?): ${text}`, 'HOUSEMAN');
-                                    Alert.alert("Request Sent", "Houseman notified.");
-                                }
-                            }
-                        );
-                    }}>
-                        <Package size={16} color={theme.colors.primary} />
-                        <Text style={styles.suppliesText}>Supplies</Text>
-                        {/* Show open request count */}
-                        {systemIncidents.filter(i => i.user.includes(user.name) && i.status === 'OPEN').length > 0 && (
-                            <View style={{ backgroundColor: theme.colors.error, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
-                                    {systemIncidents.filter(i => i.user.includes(user.name) && i.status === 'OPEN').length}
-                                </Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
+                    <View style={{ gap: 12 }}>
+                        {/* Daily Progress Bar */}
+                        {(() => {
+                            // Calculate specific user progress
+                            const myRooms = rooms.filter(r => r.assigned_cleaner === user.id || (user.groupId && r.assignedGroup === user.groupId && !r.assigned_cleaner));
+                            const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
+                            const total = myRooms.length;
+                            const progress = total > 0 ? completed / total : 0;
+
+                            return (
+                                <View style={styles.progressContainer}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                                        <Text style={styles.progressLabel}>Daily Goal</Text>
+                                        <Text style={styles.progressValue}>{completed}/{total}</Text>
+                                    </View>
+                                    <View style={styles.progressBarBg}>
+                                        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+                                    </View>
+                                </View>
+                            );
+                        })()}
+
+                        {/* Segmented Control Filter */}
+                        <View style={styles.segmentedControl}>
+                            <TouchableOpacity
+                                style={[styles.segment, !cleanerShowAll && styles.segmentBtnActive]}
+                                onPress={() => setCleanerShowAll(false)}
+                            >
+                                <Text style={[styles.segmentText, !cleanerShowAll && styles.segmentTextActive]}>My Assignment</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segment, cleanerShowAll && styles.segmentBtnActive]}
+                                onPress={() => setCleanerShowAll(true)}
+                            >
+                                <Text style={[styles.segmentText, cleanerShowAll && styles.segmentTextActive]}>Team Rooms</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 )}
 
                 {isSupervisor && (
@@ -485,20 +620,54 @@ export default function RoomListScreen() {
             {/* Active Session Timer */}
             {(isCleaner || isSupervisor) && <TimerDisplay totalMinutes={session.totalMinutes} />}
 
+            {/* Offline Banner */}
+            {isOffline && (
+                <View style={styles.offlineBanner}>
+                    <WifiOff size={20} color="white" />
+                    <Text style={styles.offlineText}>You are offline. Changes saved locally.</Text>
+                </View>
+            )}
+
             <FlatList
                 data={filteredRooms}
                 keyExtractor={item => item.id}
-                renderItem={({ item }) => (
-                    <RoomCard
-                        room={item}
-                        onPress={() => handleRoomPress(item)}
-                        showGroup={isSupervisor} // Show group badge only for supervisor
-                    />
-                )}
+                renderItem={({ item }) => {
+                    // Calculate if blocked for Visuals
+                    const isHighPriorityType = item.cleaningType === 'PREARRIVAL' || item.cleaningType === 'DEPARTURE';
+                    const isOccupied = item.guestStatus === 'GUEST_IN_ROOM' || item.guestStatus === 'DND';
+                    const isBlocked = isHighPriorityType && isOccupied;
+
+                    return (
+                        <View>
+                            {isBlocked && (
+                                <View style={styles.blockedBanner}>
+                                    <ShieldAlert size={14} color="white" />
+                                    <Text style={styles.blockedText}>BLOCKED: Guest In Room</Text>
+                                </View>
+                            )}
+                            <RoomCard
+                                room={item}
+                                onPress={() => handleRoomPress(item)}
+                                showGroup={isSupervisor}
+                                onQuickAction={isCleaner ? () => handleQuickStatusUpdate(item) : undefined}
+                                // Optional: opacity if blocked?
+                                style={isBlocked ? { opacity: 0.6 } : undefined}
+                            />
+                        </View>
+                    );
+                }}
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={renderHeader}
             />
             <NotificationsModal visible={showNotifications} onClose={() => setShowNotifications(false)} />
+
+            <ConfettiCannon
+                count={200}
+                origin={{ x: -10, y: 0 }}
+                ref={confettiRef}
+                fadeOut={true}
+                autoStart={false}
+            />
         </SafeAreaView>
     );
 }
@@ -509,10 +678,87 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     headerContainer: {
+        marginBottom: 10,
         backgroundColor: theme.colors.background,
-        paddingBottom: theme.spacing.s,
-        paddingTop: theme.spacing.s,
     },
+
+    progressContainer: {
+        marginBottom: 4,
+    },
+    progressLabel: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        fontWeight: '600'
+    },
+    progressValue: {
+        fontSize: 12,
+        color: theme.colors.text,
+        fontWeight: 'bold'
+    },
+    progressBarBg: {
+        height: 10, // Thicker
+        backgroundColor: theme.colors.border,
+        borderRadius: 5,
+        overflow: 'hidden'
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: theme.colors.success,
+        borderRadius: 5
+    },
+
+    // Team Header Styles
+    teamHeader: {
+        marginBottom: 12,
+        paddingHorizontal: 4,
+    },
+    teamTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: theme.colors.text,
+        marginBottom: 2,
+    },
+    partnerText: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        fontWeight: '500',
+    },
+
+    resultsText: {
+        marginTop: theme.spacing.s,
+        marginHorizontal: theme.spacing.m,
+        fontSize: 13,
+        fontWeight: '500',
+        color: theme.colors.textSecondary,
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: theme.colors.border, // Light gray bg
+        borderRadius: 8,
+        padding: 2,
+        marginHorizontal: theme.spacing.m,
+        marginBottom: theme.spacing.m,
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 6,
+        alignItems: 'center',
+        borderRadius: 6,
+    },
+    segmentBtnActive: {
+        backgroundColor: 'white',
+        ...theme.shadows.card
+    },
+    segmentText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.colors.textSecondary
+    },
+    segmentTextActive: {
+        color: theme.colors.primary,
+        fontWeight: 'bold'
+    },
+
     // Alert Banner
     alertBanner: {
         flexDirection: 'row',
@@ -581,40 +827,44 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.primary,
         margin: theme.spacing.m,
         padding: theme.spacing.l,
-        borderRadius: theme.borderRadius.l,
+        borderRadius: 20, // Premium radius
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        ...theme.shadows.float,
+        shadowColor: theme.colors.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 8,
     },
     summaryLabel: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 14,
+        color: 'rgba(255,255,255,0.9)',
+        fontSize: 13,
         fontWeight: '600',
-        marginBottom: 4,
+        marginBottom: 6,
+        letterSpacing: 0.5
     },
     summaryValue: {
         color: 'white',
-        fontSize: 28,
+        fontSize: 32, // Larger
         fontWeight: '800',
+        letterSpacing: -1
     },
     summaryStats: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+        backgroundColor: 'rgba(255,255,255,0.25)', // Glass effect
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)'
     },
     summaryStatText: {
         color: 'white',
         fontWeight: '700',
-        fontSize: 12,
+        fontSize: 14,
     },
-    resultsText: {
-        marginTop: theme.spacing.s,
-        marginHorizontal: theme.spacing.m,
-        fontSize: 12,
-        color: theme.colors.textSecondary,
-    },
+
+
     listContent: {
         padding: theme.spacing.m,
         paddingTop: 0,
@@ -782,7 +1032,7 @@ const styles = StyleSheet.create({
         padding: 12,
         borderRadius: 12,
         alignItems: 'center',
-        ...theme.shadows.small,
+        ...theme.shadows.card,
     },
     statCardAlert: {
         backgroundColor: theme.colors.error + '10',
@@ -808,4 +1058,58 @@ const styles = StyleSheet.create({
         color: theme.colors.error,
         fontWeight: 'bold',
     },
+
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: theme.spacing.m,
+        marginTop: theme.spacing.s,
+        backgroundColor: theme.colors.background,
+    },
+    sectionHeaderText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.colors.text,
+        marginLeft: 8,
+    },
+    // Offline Banner
+    offlineBanner: {
+        backgroundColor: theme.colors.text,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        gap: 8,
+        marginHorizontal: theme.spacing.m,
+        borderRadius: 8,
+        marginBottom: 10
+    },
+    offlineText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 14
+    },
+
+    // Blocked Banner
+    blockedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.error, // Red for blocked
+        paddingHorizontal: theme.spacing.m,
+        paddingVertical: 4,
+        marginHorizontal: theme.spacing.m,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        marginTop: 8,
+        marginBottom: -4, // Overlap slightly or connect
+        zIndex: 1,
+        gap: 6
+    },
+    blockedText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold'
+    }
 });

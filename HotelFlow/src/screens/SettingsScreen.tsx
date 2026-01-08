@@ -11,6 +11,9 @@ import * as Haptics from 'expo-haptics';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../AppNavigator';
 
 // Schema
 const profileSchema = z.object({
@@ -25,6 +28,7 @@ export default function SettingsScreen() {
     const { settings, updateSettings } = useHotel();
     const { user, logout, updateUser } = useAuth();
     const { showToast } = useToast();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
     // -- State --
     // Password Modal
@@ -147,6 +151,24 @@ export default function SettingsScreen() {
                         <Text style={styles.saveButtonText}>Save Profile</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Cleaner Schedule */}
+                {user?.role === 'CLEANER' && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Clock size={20} color={theme.colors.text} />
+                            <Text style={styles.sectionTitle}>Work Schedule</Text>
+                        </View>
+                        <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('Availability')}>
+                            <Text style={styles.rowButtonText}>My Weekly Availability</Text>
+                            <ChevronRight size={20} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('Roster')}>
+                            <Text style={styles.rowButtonText}>My Assigned Roster</Text>
+                            <ChevronRight size={20} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Preferences */}
                 <View style={styles.section}>

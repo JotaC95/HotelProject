@@ -100,11 +100,10 @@ export const SupervisorTeamDashboard = () => {
 
     // Only show groups that have actual staff assigned (Active Teams)
     const activeGroups = useMemo(() => {
-        const staffGroups = new Set(staff.map(s => s.groupId).filter(Boolean));
-        // Return group names that exist in EITHER valid staff groups OR have rooms assigned (if we want to see unassigned legacy? No, user wants to hide them).
-        // User request: "only teams created by reception". Reception creates teams by assigning staff.
-        // So we strictly filter by staffGroups.
-        return Object.keys(groups).filter(g => staffGroups.has(g)).sort();
+        const staffGroups = new Set(staff.map(s => s.groupId).filter((g): g is string => !!g));
+        // Return union of groups with Rooms OR groups with Staff
+        const allGroups = new Set([...Object.keys(groups), ...staffGroups]);
+        return Array.from(allGroups).sort();
     }, [groups, staff]);
 
     if (activeGroups.length === 0) return null;
@@ -117,7 +116,7 @@ export const SupervisorTeamDashboard = () => {
                     <TeamCard
                         key={name}
                         groupName={name}
-                        rooms={groups[name]}
+                        rooms={groups[name] || []}
                         sessionActive={session.isActive}
                         sessionStartTime={session.startTime}
                         timeEstimates={settings.timeEstimates}

@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from './contexts/AuthContext';
 import { Activity, BedDouble, Settings, LogOut } from 'lucide-react-native';
 import { theme } from './utils/theme';
-import { TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
 
 // Placeholder Screens (We will implement them properly later)
 import LoginScreen from './screens/LoginScreen';
@@ -33,6 +33,8 @@ export type RootStackParamList = {
     RoomDetail: { roomId: string };
     LostFound: undefined;
     Analytics: undefined;
+    Availability: undefined;
+    Roster: undefined;
 };
 
 export type MainTabParamList = {
@@ -124,8 +126,16 @@ function MainNavigator() {
 
 
 
+const MainStack = createNativeStackNavigator<RootStackParamList>();
+
+import AvailabilityScreen from './screens/AvailabilityScreen';
+import RosterScreen from './screens/RosterScreen';
+import { useHotel } from './contexts/HotelContext'; // Import useHotel
+import { Text } from 'react-native'; // Import Text
+
 export const AppNavigator = () => {
     const { user, isLoading } = useAuth();
+    const { isOffline, queue } = useHotel(); // Access context to show offline banner
 
     useEffect(() => {
         const subscription = Notifications.addNotificationReceivedListener(notification => {
@@ -135,38 +145,48 @@ export const AppNavigator = () => {
     }, []);
 
     if (isLoading) {
-        // Return Loading Splash ideally
-        return null; // The User Experience plan includes replacing this later if needed, but for now skeleton is inside RoomList
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+        );
     }
 
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {isOffline && (
+                <View style={{ backgroundColor: theme.colors.warning, padding: 4, alignItems: 'center', paddingTop: 40 }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>OFFLINE MODE - {queue.length} actions queued</Text>
+                </View>
+            )}
+            <MainStack.Navigator screenOptions={{ headerShown: false }}>
                 {!user ? (
-                    <Stack.Screen name="Login" component={LoginScreen} />
+                    <MainStack.Screen name="Login" component={LoginScreen} />
                 ) : (
                     // Role-Based Routing
                     <>
                         {user.role === 'MAINTENANCE' ? (
-                            <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
+                            <MainStack.Screen name="Maintenance" component={MaintenanceScreen} />
                         ) : user.role === 'RECEPTION' ? (
-                            <Stack.Screen name="Reception" component={ReceptionScreen} />
+                            <MainStack.Screen name="Reception" component={ReceptionScreen} />
                         ) : user.role === 'HOUSEMAN' ? (
-                            <Stack.Screen name="Houseman" component={HousemanScreen} />
+                            <MainStack.Screen name="Houseman" component={HousemanScreen} />
                         ) : user.role === 'SUPERVISOR' ? (
-                            <Stack.Screen name="Supervisor" component={SupervisorScreen} />
+                            <MainStack.Screen name="Supervisor" component={SupervisorScreen} />
                         ) : user.role === 'ADMIN' ? (
-                            <Stack.Screen name="Admin" component={AdminScreen} />
+                            <MainStack.Screen name="Admin" component={AdminScreen} />
                         ) : (
-                            <Stack.Screen name="Main" component={MainNavigator} />
+                            <MainStack.Screen name="Main" component={MainNavigator} />
                         )}
-                        <Stack.Screen name="RoomDetail" component={RoomDetailScreen} options={{ headerShown: true, title: 'Room Details' }} />
+                        <MainStack.Screen name="RoomDetail" component={RoomDetailScreen} options={{ headerShown: true, title: 'Room Details' }} />
                         {/* Enhanced Features */}
-                        <Stack.Screen name="LostFound" component={LostFoundScreen} options={{ presentation: 'modal' }} />
-                        <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ headerShown: true, title: 'Analytics Dashboard' }} />
+                        <MainStack.Screen name="LostFound" component={LostFoundScreen} options={{ presentation: 'modal' }} />
+                        <MainStack.Screen name="Analytics" component={AnalyticsScreen} options={{ headerShown: true, title: 'Analytics Dashboard' }} />
+                        <MainStack.Screen name="Availability" component={AvailabilityScreen} options={{ headerShown: true, title: 'My Availability' }} />
+                        <MainStack.Screen name="Roster" component={RosterScreen} options={{ headerShown: true, title: 'Staff Roster' }} />
                     </>
                 )}
-            </Stack.Navigator>
+            </MainStack.Navigator>
         </NavigationContainer>
     );
 };

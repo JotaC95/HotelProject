@@ -18,7 +18,7 @@ export default function RoomDetailScreen() {
     const route = useRoute<RoomDetailRouteProp>();
     const navigation = useNavigation();
     const { roomId } = route.params;
-    const { rooms, updateRoomStatus, toggleDND, toggleExtraTime, updateNotes, addIncident, updateGuestStatus, resolveIncident, updateRoomDetails, cleaningTypes, toggleGuestInRoom, toggleGuestWaiting, logs, reportLostItem, assets, fetchAssets, updateAssetStatus } = useHotel();
+    const { rooms, updateRoomStatus, toggleDND, toggleExtraTime, updateNotes, addIncident, updateGuestStatus, resolveIncident, updateRoomDetails, cleaningTypes, toggleGuestInRoom, toggleGuestWaiting, logs, reportLostItem, assets, fetchAssets, updateAssetStatus, settings, updateSupplies } = useHotel();
     const { user } = useAuth();
     const { showToast } = useToast();
 
@@ -96,7 +96,7 @@ export default function RoomDetailScreen() {
         fetchAssets(); // Ensure assets are loaded
     }, []);
 
-    const roomAssets = assets.filter(a => a.room === roomId || a.room_number === room?.number); // Filter by ID or Number if needed
+    const roomAssets = assets.filter(a => String(a.room) === roomId || a.room_number === room?.number); // Filter by ID or Number if needed
 
     const handleSaveDetails = async () => {
         if (!room) return;
@@ -194,594 +194,674 @@ export default function RoomDetailScreen() {
     };
 
     const handleNotifyReception = () => {
-        Alert.alert('Reception Notified', `Reception has been notified to check on Room ${room.number}.`);
+        Alert.alert(
+            'Request Reception Action',
+            'Is the guest still in the room past checkout time?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Request Call',
+                    onPress: () => {
+                        addIncident(
+                            room.id,
+                            'Late Checkout - Please Call Guest',
+                            user?.username || 'Cleaner',
+                            'RECEPTION',
+                            user?.groupId,
+                            undefined,
+                            'GUEST_REQ' // category
+                        );
+                        showToast('Reception Notified', 'SUCCESS');
+                    }
+                }
+            ]
+        );
     };
 
     const handleGuestLeft = () => {
         Alert.alert(
             'Confirm Guest Departure',
-            'Did you find the room keys?',
+            'Has the guest left the room? Did you find the keys?',
             [
+                { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'No Keys Found',
+                    text: 'Guest Left (No Keys)',
                     style: 'default',
                     onPress: () => {
                         updateGuestStatus(room.id, 'OUT', false);
-                        Alert.alert('Updated', 'Room marked as empty (No Keys).');
+                        showToast('Room marked Empty (No Keys)', 'INFO');
                     }
                 },
                 {
-                    text: 'Yes, Keys Found',
+                    text: 'Guest Left + Keys Found',
                     style: 'default',
                     onPress: () => {
                         updateGuestStatus(room.id, 'OUT', true);
-                        Alert.alert('Updated', 'Room marked as empty (Keys Found).');
+                        showToast('Room marked Empty + Keys Found', 'SUCCESS');
                     }
-                },
-                { text: 'Cancel', style: 'cancel' }
+                }
             ]
         );
     };
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-                {/* Header Card */}
-                <View style={styles.headerCard}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 10 }}>
-                        <Text style={styles.roomBigNumber}>{room.number}</Text>
-                        {['SUPERVISOR', 'RECEPTION', 'ADMIN'].includes(user?.role?.toUpperCase() || '') && (
-                            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={{ padding: 8 }}>
-                                {isEditing ? <X color={theme.colors.text} /> : <Edit2 color={theme.colors.textSecondary} />}
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity onPress={() => setHistoryVisible(true)} style={{ padding: 8 }}>
-                            <History color={theme.colors.primary} />
-                        </TouchableOpacity>
+            {/* ZEN MODE for CLEANERS in IN_PROGRESS */}
+            {(user?.role === 'CLEANER' && room.status === 'IN_PROGRESS') ? (
+                <View style={styles.zenContainer}>
+                    <View style={styles.zenHeader}>
+                        <Text style={styles.zenTitle}>Room {room.number}</Text>
+                        <View style={styles.zenTimerContainer}>
+                            <Clock size={48} color="white" />
+                            <Text style={styles.zenTimerText}>{settings.timeEstimates[room.cleaningType] || 30}m Estimate</Text>
+                        </View>
                     </View>
-                    <Text style={styles.roomType}>{room.type} • Floor {room.floor}</Text>
 
-                    {isEditing ? (
-                        <View style={{ gap: 8, width: '100%', alignItems: 'center' }}>
-                            {/* Room Type Selector */}
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                {(['Single', 'Double', 'Suite'] as const).map((t) => (
-                                    <TouchableOpacity
-                                        key={t}
-                                        style={[
-                                            styles.roleButton,
-                                            tempType === t && styles.roleButtonActive
-                                        ]}
-                                        onPress={() => setTempType(t)}
-                                    >
-                                        <Text style={[
-                                            styles.roleButtonText,
-                                            tempType === t && styles.roleButtonTextActive
-                                        ]}>{t}</Text>
-                                    </TouchableOpacity>
+                    <ScrollView style={styles.zenContent}>
+                        <View style={styles.zenSection}>
+                            <Text style={styles.zenSectionTitle}>Supplies Used</Text>
+                            <View style={styles.suppliesGrid}>
+                                {['Shampoo', 'Soap', 'Toilet Paper', 'Coffee', 'Towels', 'Water'].map(item => (
+                                    <View key={item} style={styles.supplyItem}>
+                                        <Text style={styles.supplyLabel}>{item}</Text>
+                                        <View style={styles.counterRow}>
+                                            <TouchableOpacity
+                                                style={styles.counterBtn}
+                                                onPress={() => updateSupplies(room.id, { ...room.supplies_used, [item]: Math.max(0, (room.supplies_used?.[item] || 0) - 1) })}
+                                            >
+                                                <Text style={styles.counterBtnText}>-</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.counterValue}>{room.supplies_used?.[item] || 0}</Text>
+                                            <TouchableOpacity
+                                                style={styles.counterBtn}
+                                                onPress={() => updateSupplies(room.id, { ...room.supplies_used, [item]: (room.supplies_used?.[item] || 0) + 1 })}
+                                            >
+                                                <Text style={styles.counterBtnText}>+</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
                                 ))}
                             </View>
-
-                            <TouchableOpacity
-                                style={styles.cleaningTypeSelector}
-                                onPress={() => setShowTypePicker(true)}
-                            >
-                                <Text style={styles.cleaningTypeSelectorText}>{tempCleaningType}</Text>
-                                <ChevronDown size={16} color={theme.colors.text} />
-                            </TouchableOpacity>
                         </View>
-                    ) : (
-                        <StatusBadge status={room.status} />
-                    )}
-                    {/* Hack: Show status badge below type in edit mode too if needed, or replace it. Currently replacing status badge with type selector in edit mode for focus */}
-                </View>
 
-                {/* Edit Mode Save Action */}
-                {isEditing && (
-                    <View style={styles.section}>
-                        <TouchableOpacity style={styles.saveDetailsButton} onPress={handleSaveDetails}>
-                            <Save size={18} color="white" />
-                            <Text style={styles.saveDetailsText}>Save Details</Text>
+                        <TouchableOpacity style={styles.zenFinishButton} onPress={handleAction}>
+                            <CheckCircle2 size={32} color="white" />
+                            <Text style={styles.zenFinishText}>Finish Room</Text>
                         </TouchableOpacity>
-                    </View>
-                )}
 
-                {/* Room Setup (Phase 6) */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Room Setup</Text>
-                    {isEditing ? (
-                        <View style={{ gap: 10 }}>
-                            <TextInput value={tempBeds} onChangeText={setTempBeds} placeholder="Bed Setup (e.g. 1 King)" style={styles.input} />
-                            <TextInput value={tempBedrooms} onChangeText={setTempBedrooms} placeholder="Bedrooms (e.g. 2)" keyboardType="numeric" style={styles.input} />
-                        </View>
-                    ) : (
-                        <View style={styles.configGrid}>
-                            <View style={styles.configItem}>
-                                <DoorOpen size={20} color={theme.colors.primary} />
-                                <View>
-                                    <Text style={styles.configLabel}>Bedrooms</Text>
-                                    <Text style={styles.configValue}>{room.configuration?.bedrooms || 1} Open</Text>
-                                </View>
-                            </View>
-                            <View style={styles.dividerVertical} />
-                            <View style={styles.configItem}>
-                                <Bed size={20} color={theme.colors.primary} />
-                                <View>
-                                    <Text style={styles.configLabel}>Bedding</Text>
-                                    <Text style={styles.configValue}>{room.configuration?.beds || 'Standard'}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    )}
+                        <TouchableOpacity style={styles.zenReportButton} onPress={() => { setNewIncident(''); setIsAddingIncident(true); }}>
+                            <AlertTriangle size={24} color={theme.colors.error} />
+                            <Text style={styles.zenReportText}>Report Issue</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
 
-                    {room.configuration?.extras && room.configuration.extras.length > 0 && (
-                        <View style={styles.extrasContainer}>
-                            <Package size={20} color={theme.colors.warning} />
-                            <Text style={styles.extrasText}>Extras: {room.configuration.extras.join(', ')}</Text>
-                        </View>
-                    )}
+                    {/* Next Room Hint if available */}
+                    {/* Logic to find next could be complex, omitting for now or assuming context provides it */}
                 </View>
+            ) : (
+                <>
+                    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+                        {/* Header Card */}
+                        <View style={styles.headerCard}>
+                            <View style={{ width: '100%', alignItems: 'center', marginBottom: 5, marginTop: 10 }}>
+                                <Text style={styles.roomBigNumber}>{room.number}</Text>
 
-                {/* Guest Information (Phase 3) */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Guest Information</Text>
-
-                    {isEditing ? (
-                        <View style={{ gap: 10 }}>
-                            <View>
-                                <Text style={styles.inputLabel}>Current Guest (Required)</Text>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={tempCurrentGuest}
-                                    onChangeText={setTempCurrentGuest}
-                                    placeholder="Guest Name"
-                                />
+                                <View style={{ position: 'absolute', right: 0, top: 10, flexDirection: 'row' }}>
+                                    {['SUPERVISOR', 'RECEPTION', 'ADMIN'].includes(user?.role?.toUpperCase() || '') && (
+                                        <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={{ padding: 8 }}>
+                                            {isEditing ? <X color={theme.colors.text} /> : <Edit2 color={theme.colors.textSecondary} />}
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity onPress={() => setHistoryVisible(true)} style={{ padding: 8 }}>
+                                        <History color={theme.colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
+                            <Text style={styles.roomType}>{room.type} • Floor {room.floor}</Text>
 
-                            {/* Logic: Disable Next Guest for Departure/Weekly/Rubbish */}
-                            {['DEPARTURE', 'WEEKLY', 'RUBBISH'].includes(tempCleaningType) ? (
-                                <Text style={styles.helperText}>* Next Guest not applicable for {tempCleaningType}</Text>
+                            {isEditing ? (
+                                <View style={{ gap: 8, width: '100%', alignItems: 'center' }}>
+                                    {/* Room Type Selector */}
+                                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                                        {(['Single', 'Double', 'Suite'] as const).map((t) => (
+                                            <TouchableOpacity
+                                                key={t}
+                                                style={[
+                                                    styles.roleButton,
+                                                    tempType === t && styles.roleButtonActive
+                                                ]}
+                                                onPress={() => setTempType(t)}
+                                            >
+                                                <Text style={[
+                                                    styles.roleButtonText,
+                                                    tempType === t && styles.roleButtonTextActive
+                                                ]}>{t}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={styles.cleaningTypeSelector}
+                                        onPress={() => setShowTypePicker(true)}
+                                    >
+                                        <Text style={styles.cleaningTypeSelectorText}>{tempCleaningType}</Text>
+                                        <ChevronDown size={16} color={theme.colors.text} />
+                                    </TouchableOpacity>
+                                </View>
                             ) : (
-                                <View>
-                                    <Text style={styles.inputLabel}>Next Guest</Text>
-                                    <TextInput
-                                        style={styles.editInput}
-                                        value={tempNextGuest}
-                                        onChangeText={setTempNextGuest}
-                                        placeholder="Next Guest Name"
-                                    />
-                                </View>
+                                <StatusBadge status={room.status} />
                             )}
+                            {/* Hack: Show status badge below type in edit mode too if needed, or replace it. Currently replacing status badge with type selector in edit mode for focus */}
                         </View>
-                    ) : (
-                        <View style={styles.guestRow}>
-                            <View style={styles.guestInfoItem}>
-                                <User size={20} color={room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success} />
-                                <View>
-                                    <Text style={[
-                                        styles.guestStatusText,
-                                        { color: room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success }
-                                    ]}>
-                                        {room.guestStatus === 'IN_ROOM' ? 'Guest in Room' : 'Room Empty'}
-                                    </Text>
-                                    <Text style={{ fontSize: 14, color: theme.colors.text }}>Current: {room.guestDetails?.currentGuest || 'Unknown'}</Text>
+
+                        {/* Edit Mode Save Action */}
+                        {isEditing && (
+                            <View style={styles.section}>
+                                <TouchableOpacity style={styles.saveDetailsButton} onPress={handleSaveDetails}>
+                                    <Save size={18} color="white" />
+                                    <Text style={styles.saveDetailsText}>Save Details</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Room Setup (Phase 6) */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Room Setup</Text>
+                            {isEditing ? (
+                                <View style={{ gap: 10 }}>
+                                    <TextInput value={tempBeds} onChangeText={setTempBeds} placeholder="Bed Setup (e.g. 1 King)" style={styles.input} />
+                                    <TextInput value={tempBedrooms} onChangeText={setTempBedrooms} placeholder="Bedrooms (e.g. 2)" keyboardType="numeric" style={styles.input} />
                                 </View>
-                                {room.keysFound !== undefined && (
-                                    <View style={styles.keysBadge}>
-                                        <Key size={14} color={theme.colors.textSecondary} />
-                                        <Text style={styles.keysText}>{room.keysFound ? 'Keys Found' : 'No Keys'}</Text>
+                            ) : (
+                                <View style={styles.configGrid}>
+                                    <View style={styles.configItem}>
+                                        <DoorOpen size={20} color={theme.colors.primary} />
+                                        <View>
+                                            <Text style={styles.configLabel}>Bedrooms</Text>
+                                            <Text style={styles.configValue}>{room.configuration?.bedrooms || 1} Open</Text>
+                                        </View>
                                     </View>
-                                )}
-                            </View>
+                                    <View style={styles.dividerVertical} />
+                                    <View style={styles.configItem}>
+                                        <Bed size={20} color={theme.colors.primary} />
+                                        <View>
+                                            <Text style={styles.configLabel}>Bedding</Text>
+                                            <Text style={styles.configValue}>{room.configuration?.beds || 'Standard'}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
 
-                            {/* Guest In Room Actions */}
-                            {room.guestStatus === 'IN_ROOM' && (
-                                <View style={styles.guestActions}>
-                                    <TouchableOpacity style={styles.guestActionButton} onPress={handleNotifyReception}>
-                                        <Phone size={16} color={theme.colors.primary} />
-                                        <Text style={styles.guestActionText}>Notify Reception</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.guestActionButton, styles.guestActionOutline]} onPress={handleGuestLeft}>
-                                        <LogOut size={16} color={theme.colors.text} />
-                                        <Text style={[styles.guestActionText, { color: theme.colors.text }]}>Mark Guest Left</Text>
-                                    </TouchableOpacity>
+                            {room.configuration?.extras && room.configuration.extras.length > 0 && (
+                                <View style={styles.extrasContainer}>
+                                    <Package size={20} color={theme.colors.warning} />
+                                    <Text style={styles.extrasText}>Extras: {room.configuration.extras.join(', ')}</Text>
                                 </View>
                             )}
                         </View>
-                    )}
 
-                    {!isEditing && room.cleaningType === 'DEPARTURE' && (
-                        <View style={styles.timeRow}>
-                            <View style={styles.timeItem}>
-                                <LogOut size={16} color={theme.colors.textSecondary} />
-                                <View>
-                                    <Text style={styles.timeLabel}>Checkout</Text>
-                                    <Text style={styles.timeValue}>{room.checkoutTime}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.dividerVertical} />
-                            <View style={styles.timeItem}>
-                                <LogIn size={16} color={theme.colors.textSecondary} />
-                                <View>
-                                    <Text style={styles.timeLabel}>Next Check-in</Text>
-                                    <Text style={styles.timeValue}>{room.nextCheckInTime}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    )}
-                </View>
+                        {/* Guest Information (Phase 3) */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Guest Information</Text>
 
-                {/* Conditions */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Conditions</Text>
-
-                    {/* Rush Mode (Reception/Admin Only) */}
-                    {['RECEPTION', 'ADMIN', 'SUPERVISOR'].includes(user?.role || '') && (
-                        <>
-                            <View style={[styles.row, room.isGuestWaiting && { backgroundColor: '#FFF5F5' }]}>
-                                <View style={styles.rowLabel}>
-                                    <AlertTriangle size={20} color={theme.colors.error} />
+                            {isEditing ? (
+                                <View style={{ gap: 10 }}>
                                     <View>
-                                        <Text style={[styles.rowText, { color: theme.colors.error, fontWeight: 'bold' }]}>GUEST WAITING (RUSH)</Text>
-                                        <Text style={{ fontSize: 10, color: theme.colors.error }}>Signals highest priority!</Text>
+                                        <Text style={styles.inputLabel}>Current Guest (Required)</Text>
+                                        <TextInput
+                                            style={styles.editInput}
+                                            value={tempCurrentGuest}
+                                            onChangeText={setTempCurrentGuest}
+                                            placeholder="Guest Name"
+                                        />
                                     </View>
+
+                                    {/* Logic: Disable Next Guest for Departure/Weekly/Rubbish */}
+                                    {['DEPARTURE', 'WEEKLY', 'RUBBISH'].includes(tempCleaningType) ? (
+                                        <Text style={styles.helperText}>* Next Guest not applicable for {tempCleaningType}</Text>
+                                    ) : (
+                                        <View>
+                                            <Text style={styles.inputLabel}>Next Guest</Text>
+                                            <TextInput
+                                                style={styles.editInput}
+                                                value={tempNextGuest}
+                                                onChangeText={setTempNextGuest}
+                                                placeholder="Next Guest Name"
+                                            />
+                                        </View>
+                                    )}
+                                </View>
+                            ) : (
+                                <View style={styles.guestRow}>
+                                    <View style={styles.guestInfoItem}>
+                                        <User size={20} color={room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success} />
+                                        <View>
+                                            <Text style={[
+                                                styles.guestStatusText,
+                                                { color: room.guestStatus === 'IN_ROOM' ? theme.colors.warning : theme.colors.success }
+                                            ]}>
+                                                {room.guestStatus === 'IN_ROOM' ? 'Guest in Room' : 'Room Empty'}
+                                            </Text>
+                                            <Text style={{ fontSize: 14, color: theme.colors.text }}>Current: {room.guestDetails?.currentGuest || 'Unknown'}</Text>
+                                        </View>
+                                        {room.keysFound !== undefined && (
+                                            <View style={styles.keysBadge}>
+                                                <Key size={14} color={theme.colors.textSecondary} />
+                                                <Text style={styles.keysText}>{room.keysFound ? 'Keys Found' : 'No Keys'}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* Guest In Room Actions */}
+                                    {room.guestStatus === 'IN_ROOM' && (
+                                        <View style={styles.guestActions}>
+                                            <TouchableOpacity style={styles.guestActionButton} onPress={handleNotifyReception}>
+                                                <Phone size={16} color={theme.colors.primary} />
+                                                <Text style={styles.guestActionText}>Request Call</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={[styles.guestActionButton, styles.guestActionOutline]} onPress={handleGuestLeft}>
+                                                <LogOut size={16} color={theme.colors.text} />
+                                                <Text style={[styles.guestActionText, { color: theme.colors.text }]}>Guest Left / Keys</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+
+                            {!isEditing && room.cleaningType === 'DEPARTURE' && (
+                                <View style={styles.timeRow}>
+                                    <View style={styles.timeItem}>
+                                        <LogOut size={16} color={theme.colors.textSecondary} />
+                                        <View>
+                                            <Text style={styles.timeLabel}>Checkout</Text>
+                                            <Text style={styles.timeValue}>{room.checkoutTime}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.dividerVertical} />
+                                    <View style={styles.timeItem}>
+                                        <LogIn size={16} color={theme.colors.textSecondary} />
+                                        <View>
+                                            <Text style={styles.timeLabel}>Next Check-in</Text>
+                                            <Text style={styles.timeValue}>{room.nextCheckInTime}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Conditions */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Conditions</Text>
+
+                            {/* Rush Mode (Reception/Admin Only) */}
+                            {['RECEPTION', 'ADMIN', 'SUPERVISOR'].includes(user?.role || '') && (
+                                <>
+                                    <View style={[styles.row, room.isGuestWaiting && { backgroundColor: '#FFF5F5' }]}>
+                                        <View style={styles.rowLabel}>
+                                            <AlertTriangle size={20} color={theme.colors.error} />
+                                            <View>
+                                                <Text style={[styles.rowText, { color: theme.colors.error, fontWeight: 'bold' }]}>GUEST WAITING (RUSH)</Text>
+                                                <Text style={{ fontSize: 10, color: theme.colors.error }}>Signals highest priority!</Text>
+                                            </View>
+                                        </View>
+                                        <Switch
+                                            value={room.isGuestWaiting}
+                                            onValueChange={() => toggleGuestWaiting(room.id, !room.isGuestWaiting)}
+                                            trackColor={{ false: theme.colors.border, true: theme.colors.error }}
+                                        />
+                                    </View>
+                                    <View style={styles.divider} />
+                                </>
+                            )}
+
+                            <View style={styles.row}>
+                                <View style={styles.rowLabel}>
+                                    <Moon size={20} color={theme.colors.secondary} />
+                                    <Text style={styles.rowText}>Do Not Disturb</Text>
                                 </View>
                                 <Switch
-                                    value={room.isGuestWaiting}
-                                    onValueChange={() => toggleGuestWaiting(room.id, !room.isGuestWaiting)}
-                                    trackColor={{ false: theme.colors.border, true: theme.colors.error }}
+                                    value={room.isDND}
+                                    onValueChange={() => toggleDND(room.id)}
+                                    trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
                                 />
                             </View>
                             <View style={styles.divider} />
-                        </>
-                    )}
 
-                    <View style={styles.row}>
-                        <View style={styles.rowLabel}>
-                            <Moon size={20} color={theme.colors.secondary} />
-                            <Text style={styles.rowText}>Do Not Disturb</Text>
+                            <View style={[styles.row]}>
+                                <View style={styles.rowLabel}>
+                                    <Clock size={20} color={theme.colors.info} />
+                                    <Text style={styles.rowText}>Extra Time Needed</Text>
+                                </View>
+                                <Switch
+                                    value={room.extraTime}
+                                    onValueChange={() => toggleExtraTime(room.id)}
+                                    trackColor={{ false: theme.colors.border, true: theme.colors.info }}
+                                />
+                            </View>
                         </View>
-                        <Switch
-                            value={room.isDND}
-                            onValueChange={() => toggleDND(room.id)}
-                            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
-                        />
-                    </View>
-                    <View style={styles.divider} />
 
-                    <View style={[styles.row]}>
-                        <View style={styles.rowLabel}>
-                            <Clock size={20} color={theme.colors.info} />
-                            <Text style={styles.rowText}>Extra Time Needed</Text>
+                        {/* Lost & Found Section */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Lost & Found</Text>
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: theme.colors.warning }]}
+                                onPress={() => setLostItemModalVisible(true)}
+                            >
+                                <Briefcase size={20} color="white" />
+                                <Text style={styles.actionButtonText}>Report Found Item</Text>
+                            </TouchableOpacity>
                         </View>
-                        <Switch
-                            value={room.extraTime}
-                            onValueChange={() => toggleExtraTime(room.id)}
-                            trackColor={{ false: theme.colors.border, true: theme.colors.info }}
-                        />
-                    </View>
-                </View>
 
-                {/* Lost & Found Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Lost & Found</Text>
-                    <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: theme.colors.warning }]}
-                        onPress={() => setLostItemModalVisible(true)}
-                    >
-                        <Briefcase size={20} color="white" />
-                        <Text style={styles.actionButtonText}>Report Found Item</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Cleaner Quick Reports */}
-                {user?.role === 'CLEANER' && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Quick Report</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-                            {[
-                                { label: 'Bulb', icon: '💡', text: 'Light bulb replacement needed', role: 'MAINTENANCE', category: 'MAINTENANCE' },
-                                { label: 'Leak', icon: '🚿', text: 'Water leak detected', role: 'MAINTENANCE', category: 'MAINTENANCE' },
-                                { label: 'Soap', icon: '🧴', text: 'Missing Soap/Shampoo', role: 'HOUSEMAN', category: 'SUPPLY' },
-                                { label: 'Towels', icon: '🧖', text: 'Extra Towels needed', role: 'HOUSEMAN', category: 'SUPPLY' },
-                                { label: 'Linen', icon: '🛏️', text: 'Fresh Linen needed', role: 'HOUSEMAN', category: 'SUPPLY' },
-                                { label: 'Stain', icon: '🧽', text: 'Carpet/Sheet Stain', role: 'MAINTENANCE', category: 'MAINTENANCE' },
-                                { label: 'TV', icon: '📺', text: 'TV Remote Issues', role: 'MAINTENANCE', category: 'MAINTENANCE' }
-                            ].map((item, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    style={styles.quickReportBtn}
-                                    onPress={() => {
-                                        Alert.alert("Report Issue", `Report "${item.text}"?`, [
-                                            { text: "Cancel", style: "cancel" },
-                                            { text: "Report", onPress: () => addIncident(room.id, item.text, user.username, item.role as any, user.groupId, undefined, item.category as any) }
-                                        ]);
-                                    }}
-                                >
-                                    <Text style={{ fontSize: 24 }}>{item.icon}</Text>
-                                    <Text style={styles.quickReportText}>{item.label}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
-
-
-
-
-                {/* Incidents */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Incidents</Text>
-                        <TouchableOpacity onPress={() => setIsAddingIncident(!isAddingIncident)}>
-                            <Plus color={theme.colors.primary} size={24} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {isAddingIncident && (
-                        <View style={styles.addIncidentBox}>
-                            {/* Quick Chips */}
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
-                                {INCIDENT_PRESETS.map((preset, i) => (
-                                    <TouchableOpacity
-                                        key={i}
-                                        style={styles.chip}
-                                        onPress={() => setNewIncident(preset)}
-                                    >
-                                        <Text style={styles.chipText}>{preset}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-
-                            {/* Role Selection */}
-                            <View style={styles.roleSelector}>
-                                <Text style={styles.roleLabel}>Assign To:</Text>
-                                <View style={styles.roleButtons}>
-                                    {(['MAINTENANCE', 'RECEPTION', 'SUPERVISOR'] as IncidentRole[]).map((role) => (
+                        {/* Cleaner Quick Reports */}
+                        {user?.role === 'CLEANER' && (
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>Quick Report</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                                    {[
+                                        { label: 'Bulb', icon: '💡', text: 'Light bulb replacement needed', role: 'MAINTENANCE', category: 'MAINTENANCE' },
+                                        { label: 'Leak', icon: '🚿', text: 'Water leak detected', role: 'MAINTENANCE', category: 'MAINTENANCE' },
+                                        { label: 'Soap', icon: '🧴', text: 'Missing Soap/Shampoo', role: 'HOUSEMAN', category: 'SUPPLY' },
+                                        { label: 'Towels', icon: '🧖', text: 'Extra Towels needed', role: 'HOUSEMAN', category: 'SUPPLY' },
+                                        { label: 'Linen', icon: '🛏️', text: 'Fresh Linen needed', role: 'HOUSEMAN', category: 'SUPPLY' },
+                                        { label: 'Stain', icon: '🧽', text: 'Carpet/Sheet Stain', role: 'MAINTENANCE', category: 'MAINTENANCE' },
+                                        { label: 'TV', icon: '📺', text: 'TV Remote Issues', role: 'MAINTENANCE', category: 'MAINTENANCE' }
+                                    ].map((item, index) => (
                                         <TouchableOpacity
-                                            key={role}
-                                            style={[styles.roleButton, targetRole === role && styles.roleButtonActive]}
-                                            onPress={() => setTargetRole(role)}
+                                            key={index}
+                                            style={styles.quickReportBtn}
+                                            onPress={() => {
+                                                Alert.alert("Report Issue", `Report "${item.text}"?`, [
+                                                    { text: "Cancel", style: "cancel" },
+                                                    { text: "Report", onPress: () => addIncident(room.id, item.text, user.username, item.role as any, user.groupId, undefined, item.category as any) }
+                                                ]);
+                                            }}
                                         >
-                                            <Text style={[styles.roleButtonText, targetRole === role && styles.roleButtonTextActive]}>
-                                                {role.charAt(0) + role.slice(1).toLowerCase()}
-                                            </Text>
+                                            <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+                                            <Text style={styles.quickReportText}>{item.label}</Text>
                                         </TouchableOpacity>
                                     ))}
-                                </View>
+                                </ScrollView>
                             </View>
+                        )}
 
-                            <TextInput
-                                style={styles.incidentInput}
-                                placeholder="Describe the issue..."
-                                value={newIncident}
-                                onChangeText={setNewIncident}
-                            />
 
-                            {attachedPhoto && (
-                                <View style={styles.photoPreview}>
-                                    <Image source={{ uri: attachedPhoto }} style={styles.previewImage} />
-                                    <TouchableOpacity onPress={() => setAttachedPhoto(null)}>
-                                        <Text style={styles.removePhotoText}>Remove Photo</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
 
-                            <View style={styles.actionRow}>
-                                <TouchableOpacity style={styles.iconButton} onPress={handleAttachPhoto}>
-                                    <Camera size={24} color={theme.colors.textSecondary} />
-                                </TouchableOpacity>
 
-                                <TouchableOpacity
-                                    style={[styles.addIncidentButton, isTranslating && styles.buttonDisabled, { flex: 1, marginLeft: 10 }]}
-                                    onPress={handleAddIncident}
-                                    disabled={isTranslating}
-                                >
-                                    {isTranslating ? (
-                                        <Languages size={18} color="white" />
-                                    ) : (
-                                        <Text style={styles.addIncidentButtonText}>Report</Text>
-                                    )}
+                        {/* Incidents */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Incidents</Text>
+                                <TouchableOpacity onPress={() => setIsAddingIncident(!isAddingIncident)}>
+                                    <Plus color={theme.colors.primary} size={24} />
                                 </TouchableOpacity>
                             </View>
-                        </View>
-                    )}
 
-                    {room.incidents.length === 0 ? (
-                        <Text style={styles.emptyText}>No incidents reported.</Text>
-                    ) : (
-                        room.incidents.map((inc, i) => (
-                            <View key={i} style={[styles.incidentItem, inc.status === 'RESOLVED' && styles.incidentResolved]}>
-                                {inc.status === 'RESOLVED' ? (
-                                    <CheckCircle2 size={16} color={theme.colors.success} style={{ marginTop: 2 }} />
-                                ) : (
-                                    <AlertTriangle size={16} color={theme.colors.error} style={{ marginTop: 2 }} />
-                                )}
-                                <View style={{ flex: 1, marginLeft: 8 }}>
-                                    <View style={styles.incidentHeader}>
-                                        <Text style={[styles.incidentText, inc.status === 'RESOLVED' && styles.textResolved]}>
-                                            {inc.text}
-                                        </Text>
-                                        <View style={[styles.roleTag, { backgroundColor: inc.targetRole === 'MAINTENANCE' ? theme.colors.warning + '20' : theme.colors.info + '20' }]}>
-                                            <Text style={styles.roleTagText}>{inc.targetRole}</Text>
+                            {isAddingIncident && (
+                                <View style={styles.addIncidentBox}>
+                                    {/* Quick Chips */}
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
+                                        {INCIDENT_PRESETS.map((preset, i) => (
+                                            <TouchableOpacity
+                                                key={i}
+                                                style={styles.chip}
+                                                onPress={() => setNewIncident(preset)}
+                                            >
+                                                <Text style={styles.chipText}>{preset}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+
+                                    {/* Role Selection */}
+                                    <View style={styles.roleSelector}>
+                                        <Text style={styles.roleLabel}>Assign To:</Text>
+                                        <View style={styles.roleButtons}>
+                                            {(['MAINTENANCE', 'RECEPTION', 'SUPERVISOR'] as IncidentRole[]).map((role) => (
+                                                <TouchableOpacity
+                                                    key={role}
+                                                    style={[styles.roleButton, targetRole === role && styles.roleButtonActive]}
+                                                    onPress={() => setTargetRole(role)}
+                                                >
+                                                    <Text style={[styles.roleButtonText, targetRole === role && styles.roleButtonTextActive]}>
+                                                        {role.charAt(0) + role.slice(1).toLowerCase()}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
                                         </View>
                                     </View>
 
-                                    <Text style={styles.incidentMeta}>
-                                        {new Date(inc.timestamp).toLocaleTimeString()} • {inc.user} • {inc.status}
-                                    </Text>
-                                    {inc.photoUri && (
-                                        <Image source={{ uri: inc.photoUri }} style={styles.incidentImage} />
+                                    <TextInput
+                                        style={styles.incidentInput}
+                                        placeholder="Describe the issue..."
+                                        value={newIncident}
+                                        onChangeText={setNewIncident}
+                                    />
+
+                                    {attachedPhoto && (
+                                        <View style={styles.photoPreview}>
+                                            <Image source={{ uri: attachedPhoto }} style={styles.previewImage} />
+                                            <TouchableOpacity onPress={() => setAttachedPhoto(null)}>
+                                                <Text style={styles.removePhotoText}>Remove Photo</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     )}
 
-                                    {inc.status === 'OPEN' && (
-                                        <TouchableOpacity
-                                            style={styles.resolveButton}
-                                            onPress={() => {
-                                                resolveIncident(room.id, inc.id);
-                                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                            }}
-                                        >
-                                            <Text style={styles.resolveButtonText}>Mark Resolved</Text>
+                                    <View style={styles.actionRow}>
+                                        <TouchableOpacity style={styles.iconButton} onPress={handleAttachPhoto}>
+                                            <Camera size={24} color={theme.colors.textSecondary} />
                                         </TouchableOpacity>
-                                    )}
+
+                                        <TouchableOpacity
+                                            style={[styles.addIncidentButton, isTranslating && styles.buttonDisabled, { flex: 1, marginLeft: 10 }]}
+                                            onPress={handleAddIncident}
+                                            disabled={isTranslating}
+                                        >
+                                            {isTranslating ? (
+                                                <Languages size={18} color="white" />
+                                            ) : (
+                                                <Text style={styles.addIncidentButtonText}>Report</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
-                            </View>
-                        ))
-                    )}
-                </View>
-
-                {/* Notes */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Housekeeping Notes</Text>
-                    <View style={styles.notesContainer}>
-                        <TextInput
-                            style={styles.notesInput}
-                            multiline
-                            placeholder="Add notes about this room..."
-                            value={notes}
-                            onChangeText={setNotes}
-                            textAlignVertical="top"
-                        />
-                        <TouchableOpacity style={styles.saveButton} onPress={handleSaveNotes}>
-                            <Save size={16} color="white" />
-                            <Text style={styles.saveButtonText}>Save Note</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-            </ScrollView >
-
-            {/* Floating Action Button (Phase 3) */}
-            {
-                room.status !== 'COMPLETED' && (
-                    <View style={styles.footerOverlay}>
-                        <TouchableOpacity
-                            style={[
-                                styles.actionButton,
-                                {
-                                    backgroundColor:
-                                        room.guestStatus === 'IN_ROOM' || isBlocked ? theme.colors.border :
-                                            (room.status === 'PENDING' ? theme.colors.primary :
-                                                room.status === 'INSPECTION' ? theme.colors.success : // Approve
-                                                    theme.colors.info), // Finish -> Inspection
-                                    opacity: (room.guestStatus === 'IN_ROOM' || isBlocked) ? 0.8 : 1
-                                }
-                            ]}
-                            onPress={handleAction}
-                            disabled={room.guestStatus === 'IN_ROOM' || isBlocked}
-                        >
-                            {isBlocked ? (
-                                <>
-                                    <AlertTriangle size={24} color={theme.colors.textSecondary} />
-                                    <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Resolve Incidents First</Text>
-                                </>
-                            ) : room.guestStatus === 'IN_ROOM' ? (
-                                <>
-                                    <User size={24} color={theme.colors.textSecondary} />
-                                    <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Guest In Room</Text>
-                                </>
-                            ) : room.status === 'PENDING' ? (
-                                <>
-                                    <Play size={24} color="white" fill="white" />
-                                    <Text style={styles.actionButtonText}>Start Cleaning</Text>
-                                </>
-                            ) : room.status === 'INSPECTION' && isSupervisor ? (
-                                <>
-                                    <CheckCircle2 size={24} color="white" />
-                                    <Text style={styles.actionButtonText}>Approve Inspection</Text>
-                                </>
-                            ) : room.status === 'INSPECTION' && !isSupervisor ? (
-                                <>
-                                    <Clock size={24} color="white" />
-                                    <Text style={styles.actionButtonText}>Pending Inspection</Text>
-                                </>
-                            ) : (
-                                <>
-                                    <UserCheck size={24} color="white" />
-                                    <Text style={styles.actionButtonText}>Finish & Request Inspection</Text>
-                                </>
                             )}
-                        </TouchableOpacity>
 
-                        {room.status === 'INSPECTION' && isSupervisor && (
-                            <TouchableOpacity
-                                style={[styles.actionButton, styles.rejectButton]}
-                                onPress={handleReject}
-                            >
-                                <AlertTriangle size={24} color="white" />
-                                <Text style={styles.actionButtonText}>Reject</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                )
-            }
+                            {room.incidents.length === 0 ? (
+                                <Text style={styles.emptyText}>No incidents reported.</Text>
+                            ) : (
+                                room.incidents.map((inc, i) => (
+                                    <View key={i} style={[styles.incidentItem, inc.status === 'RESOLVED' && styles.incidentResolved]}>
+                                        {inc.status === 'RESOLVED' ? (
+                                            <CheckCircle2 size={16} color={theme.colors.success} style={{ marginTop: 2 }} />
+                                        ) : (
+                                            <AlertTriangle size={16} color={theme.colors.error} style={{ marginTop: 2 }} />
+                                        )}
+                                        <View style={{ flex: 1, marginLeft: 8 }}>
+                                            <View style={styles.incidentHeader}>
+                                                <Text style={[styles.incidentText, inc.status === 'RESOLVED' && styles.textResolved]}>
+                                                    {inc.text}
+                                                </Text>
+                                                <View style={[styles.roleTag, { backgroundColor: inc.targetRole === 'MAINTENANCE' ? theme.colors.warning + '20' : theme.colors.info + '20' }]}>
+                                                    <Text style={styles.roleTagText}>{inc.targetRole}</Text>
+                                                </View>
+                                            </View>
 
-            {/* Cleaning Type Picker Modal */}
-            <Modal visible={showTypePicker} transparent animationType="slide">
-                <TouchableWithoutFeedback onPress={() => setShowTypePicker(false)}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Select Cleaning Type</Text>
-                                <ScrollView>
-                                    {(['DEPARTURE', 'PREARRIVAL', 'WEEKLY', 'HOLDOVER', 'RUBBISH', 'DAYUSE'] as CleaningType[]).map((type) => (
-                                        <TouchableOpacity
-                                            key={type}
-                                            style={[styles.typeOption, tempCleaningType === type && styles.typeOptionSelected]}
-                                            onPress={() => {
-                                                setTempCleaningType(type);
-                                                setShowTypePicker(false);
-                                            }}
-                                        >
-                                            <Text style={[styles.typeOptionText, tempCleaningType === type && styles.typeOptionTextSelected]}>{type}</Text>
-                                            {tempCleaningType === type && <Check size={20} color={theme.colors.primary} />}
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                                <TouchableOpacity style={styles.closeButton} onPress={() => setShowTypePicker(false)}>
-                                    <Text style={styles.closeButtonText}>Cancel</Text>
+                                            <Text style={styles.incidentMeta}>
+                                                {new Date(inc.timestamp).toLocaleTimeString()} • {inc.user} • {inc.status}
+                                            </Text>
+                                            {inc.photoUri && (
+                                                <Image source={{ uri: inc.photoUri }} style={styles.incidentImage} />
+                                            )}
+
+                                            {inc.status === 'OPEN' && (
+                                                <TouchableOpacity
+                                                    style={styles.resolveButton}
+                                                    onPress={() => {
+                                                        resolveIncident(room.id, inc.id);
+                                                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                                    }}
+                                                >
+                                                    <Text style={styles.resolveButtonText}>Mark Resolved</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    </View>
+                                ))
+                            )}
+                        </View>
+
+                        {/* Notes */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Housekeeping Notes</Text>
+                            <View style={styles.notesContainer}>
+                                <TextInput
+                                    style={styles.notesInput}
+                                    multiline
+                                    placeholder="Add notes about this room..."
+                                    value={notes}
+                                    onChangeText={setNotes}
+                                    textAlignVertical="top"
+                                />
+                                <TouchableOpacity style={styles.saveButton} onPress={handleSaveNotes}>
+                                    <Text style={styles.saveButtonText}>Save Note</Text>
                                 </TouchableOpacity>
                             </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
+                        </View>
 
-            {/* History Modal */}
-            <Modal visible={isHistoryVisible} transparent animationType="slide">
-                <TouchableWithoutFeedback onPress={() => setHistoryVisible(false)}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={[styles.modalContent, { maxHeight: '70%' }]}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-                                    <Text style={styles.modalTitle}>History Log</Text>
-                                    <TouchableOpacity onPress={() => setHistoryVisible(false)}>
-                                        <X size={24} color={theme.colors.text} />
-                                    </TouchableOpacity>
-                                </View>
-                                <ScrollView>
-                                    {logs.filter(log => log.roomId === room.id || log.message.includes(`Room ${room.number}`)).length > 0 ? (
-                                        logs
-                                            .filter(log => log.roomId === room.id || log.message.includes(`Room ${room.number}`))
-                                            .map((log) => (
-                                                <View key={log.id} style={styles.historyItem}>
-                                                    <View style={[styles.historyDot, { backgroundColor: log.type === 'STATUS' ? theme.colors.primary : log.type === 'INCIDENT' ? theme.colors.error : theme.colors.textSecondary }]} />
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.historyMessage}>{log.message}</Text>
-                                                        <Text style={styles.historyTime}>{new Date(log.timestamp).toLocaleString()}</Text>
-                                                    </View>
-                                                </View>
-                                            ))
+                    </ScrollView>
+
+                    {/* Floating Action Button (Phase 3) */}
+                    {
+                        room.status !== 'COMPLETED' && (
+                            <View style={styles.footerOverlay}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.actionButton,
+                                        {
+                                            backgroundColor:
+                                                room.guestStatus === 'IN_ROOM' || isBlocked ? theme.colors.border :
+                                                    (room.status === 'PENDING' ? theme.colors.primary :
+                                                        room.status === 'INSPECTION' ? theme.colors.success : // Approve
+                                                            theme.colors.info), // Finish -> Inspection
+                                            opacity: (room.guestStatus === 'IN_ROOM' || isBlocked) ? 0.8 : 1
+                                        }
+                                    ]}
+                                    onPress={handleAction}
+                                    disabled={room.guestStatus === 'IN_ROOM' || isBlocked}
+                                >
+                                    {isBlocked ? (
+                                        <>
+                                            <AlertTriangle size={24} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Resolve Incidents First</Text>
+                                        </>
+                                    ) : room.guestStatus === 'IN_ROOM' ? (
+                                        <>
+                                            <User size={24} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Guest In Room</Text>
+                                        </>
+                                    ) : room.status === 'PENDING' ? (
+                                        <>
+                                            <Play size={24} color="white" fill="white" />
+                                            <Text style={styles.actionButtonText}>Start Cleaning</Text>
+                                        </>
+                                    ) : room.status === 'INSPECTION' && isSupervisor ? (
+                                        <>
+                                            <CheckCircle2 size={24} color="white" />
+                                            <Text style={styles.actionButtonText}>Approve Inspection</Text>
+                                        </>
+                                    ) : room.status === 'INSPECTION' && !isSupervisor ? (
+                                        <>
+                                            <Clock size={24} color="white" />
+                                            <Text style={styles.actionButtonText}>Pending Inspection</Text>
+                                        </>
                                     ) : (
-                                        <Text style={{ textAlign: 'center', color: theme.colors.textSecondary, marginTop: 20 }}>No available history for this room.</Text>
+                                        <>
+                                            <UserCheck size={24} color="white" />
+                                            <Text style={styles.actionButtonText}>Finish & Request Inspection</Text>
+                                        </>
                                     )}
-                                </ScrollView>
+                                </TouchableOpacity>
+
+                                {room.status === 'INSPECTION' && isSupervisor && (
+                                    <TouchableOpacity
+                                        style={[styles.actionButton, styles.rejectButton]}
+                                        onPress={handleReject}
+                                    >
+                                        <AlertTriangle size={24} color="white" />
+                                        <Text style={styles.actionButtonText}>Reject</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )
+                    }
+
+                    {/* Cleaning Type Picker Modal */}
+                    <Modal visible={showTypePicker} transparent animationType="slide">
+                        <TouchableWithoutFeedback onPress={() => setShowTypePicker(false)}>
+                            <View style={styles.modalOverlay}>
+                                <TouchableWithoutFeedback>
+                                    <View style={styles.modalContent}>
+                                        <Text style={styles.modalTitle}>Select Cleaning Type</Text>
+                                        <ScrollView>
+                                            {(['DEPARTURE', 'PREARRIVAL', 'WEEKLY', 'HOLDOVER', 'RUBBISH', 'DAYUSE'] as CleaningType[]).map((type) => (
+                                                <TouchableOpacity
+                                                    key={type}
+                                                    style={[styles.typeOption, tempCleaningType === type && styles.typeOptionSelected]}
+                                                    onPress={() => {
+                                                        setTempCleaningType(type);
+                                                        setShowTypePicker(false);
+                                                    }}
+                                                >
+                                                    <Text style={[styles.typeOptionText, tempCleaningType === type && styles.typeOptionTextSelected]}>{type}</Text>
+                                                    {tempCleaningType === type && <Check size={20} color={theme.colors.primary} />}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                        <TouchableOpacity style={styles.closeButton} onPress={() => setShowTypePicker(false)}>
+                                            <Text style={styles.closeButtonText}>Cancel</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </TouchableWithoutFeedback>
                             </View>
                         </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
+                    </Modal>
+
+                    {/* History Modal */}
+                    <Modal visible={isHistoryVisible} transparent animationType="slide">
+                        <TouchableWithoutFeedback onPress={() => setHistoryVisible(false)}>
+                            <View style={styles.modalOverlay}>
+                                <TouchableWithoutFeedback>
+                                    <View style={[styles.modalContent, { maxHeight: '70%' }]}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                                            <Text style={styles.modalTitle}>History Log</Text>
+                                            <TouchableOpacity onPress={() => setHistoryVisible(false)}>
+                                                <X size={24} color={theme.colors.text} />
+                                            </TouchableOpacity>
+                                        </View>
+                                        <ScrollView>
+                                            {logs.filter(log => log.roomId === room.id || log.message.includes(`Room ${room.number}`)).length > 0 ? (
+                                                logs
+                                                    .filter(log => log.roomId === room.id || log.message.includes(`Room ${room.number}`))
+                                                    .map((log) => (
+                                                        <View key={log.id} style={styles.historyItem}>
+                                                            <View style={[styles.historyDot, { backgroundColor: log.type === 'STATUS' ? theme.colors.primary : log.type === 'INCIDENT' ? theme.colors.error : theme.colors.textSecondary }]} />
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.historyMessage}>{log.message}</Text>
+                                                                <Text style={styles.historyTime}>{new Date(log.timestamp).toLocaleString()}</Text>
+                                                            </View>
+                                                        </View>
+                                                    ))
+                                            ) : (
+                                                <Text style={{ textAlign: 'center', color: theme.colors.textSecondary, marginTop: 20 }}>No available history for this room.</Text>
+                                            )}
+                                        </ScrollView>
+                                    </View>
+                                </TouchableWithoutFeedback>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </Modal>
+                </>
+            )
+            }
         </KeyboardAvoidingView >
     );
 }
@@ -937,9 +1017,11 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.m,
     },
     roomBigNumber: {
-        fontSize: 32,
+        fontSize: 48,
         fontWeight: '800',
         color: theme.colors.text,
+        letterSpacing: -1,
+        includeFontPadding: false
     },
     roomType: {
         fontSize: 16,
@@ -1357,5 +1439,121 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: theme.colors.textSecondary,
         marginBottom: 4,
+    },
+    // Zen Mode Styles
+    zenContainer: {
+        flex: 1,
+        backgroundColor: theme.colors.primary,
+    },
+    zenHeader: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.primary,
+    },
+    zenTitle: {
+        fontSize: 48,
+        fontWeight: 'bold',
+        color: 'white',
+        marginBottom: 20
+    },
+    zenTimerContainer: {
+        alignItems: 'center',
+        gap: 10
+    },
+    zenTimerText: {
+        fontSize: 24,
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: '600'
+    },
+    zenContent: {
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        padding: 20
+    },
+    zenSection: {
+        marginBottom: 30
+    },
+    zenSectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        marginBottom: 15
+    },
+    suppliesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 15
+    },
+    supplyItem: {
+        width: '47%',
+        backgroundColor: theme.colors.card,
+        padding: 15,
+        borderRadius: 12,
+        ...theme.shadows.card
+    },
+    supplyLabel: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        marginBottom: 10
+    },
+    counterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+    },
+    counterBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: theme.colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.border
+    },
+    counterBtnText: {
+        fontSize: 18,
+        color: theme.colors.primary,
+        fontWeight: 'bold'
+    },
+    counterValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text
+    },
+    zenFinishButton: {
+        backgroundColor: theme.colors.success,
+        padding: 20,
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        marginBottom: 15,
+        ...theme.shadows.card
+    },
+    zenFinishText: {
+        color: 'white',
+        fontSize: 20,
+        fontWeight: 'bold'
+    },
+    zenReportButton: {
+        backgroundColor: '#FFF5F5',
+        padding: 16,
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        borderWidth: 1,
+        borderColor: theme.colors.error
+    },
+    zenReportText: {
+        color: theme.colors.error,
+        fontSize: 16,
+        fontWeight: '600'
     }
 });

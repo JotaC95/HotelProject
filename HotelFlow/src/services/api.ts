@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// const BASE_URL = 'https://20f4778c3372.ngrok-free.app/api'; // Ngrok Backup
-const BASE_URL = 'http://192.168.0.171:8000/api'; // Local LAN IP
+//const BASE_URL = 'http://192.168.0.171:8000/api'; // Local LAN IP
+const BASE_URL = 'https://52f2e4c5bf65.ngrok-free.app/api'; // Ngrok Tunnel
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -14,11 +14,7 @@ const api = axios.create({
 api.interceptors.response.use(
   response => response,
   error => {
-    console.log('API Error:', error.message);
-    if (error.response) {
-      console.log('Status:', error.response.status);
-      console.log('Data:', error.response.data);
-    }
+    // console.log('API Error:', error.message);
     return Promise.reject(error);
   }
 );

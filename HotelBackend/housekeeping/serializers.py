@@ -23,6 +23,18 @@ class IncidentSerializer(serializers.ModelSerializer):
 
 class RoomSerializer(serializers.ModelSerializer):
     incidents = IncidentSerializer(many=True, read_only=True)
+    assigned_cleaner = serializers.PrimaryKeyRelatedField(read_only=True)
+    assigned_cleaner_name = serializers.CharField(source='assigned_cleaner.username', read_only=True)
+    floor = serializers.SerializerMethodField()
+
+    def get_floor(self, obj):
+        try:
+            # Assuming simplified logic: Rooms 1-20 Floor 1, etc.
+            # Mirroring the script logic: (i // 20) + 1
+            num = int(obj.number)
+            return ((num - 1) // 20) + 1
+        except ValueError:
+            return 1
 
     def validate(self, data):
         cleaning_type = data.get('cleaning_type', self.instance.cleaning_type if self.instance else None)
@@ -43,6 +55,14 @@ class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = '__all__'
+        # Explicitly enabling supplies_used if __all__ doesn't catch it automatically (it does, but sticking to plan if I was explicit before. Wait, __all__ covers it!)
+        # actually, previous attempt I tried to list fields. The file currently has fields = '__all__'.
+        # So I DO NOT need to edit serializers.py if it uses __all__!
+        # Let me double check the file content I read in Step 574.
+        # Line 47: fields = '__all__'
+        # So "supplies_used" is ALREADY included!
+        # I can SKIP this step.
+
 
 class CleaningSessionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -68,3 +88,17 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = '__all__'
+
+from .models import StaffAvailability, WorkShift
+
+class StaffAvailabilitySerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    class Meta:
+        model = StaffAvailability
+        fields = ['id', 'user', 'user_name', 'date', 'status', 'start_time', 'end_time']
+
+class WorkShiftSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    class Meta:
+        model = WorkShift
+        fields = ['id', 'user', 'user_name', 'date', 'start_time', 'end_time']

@@ -105,7 +105,7 @@ export default function AdminScreen() {
             name: invForm.name,
             quantity: parseInt(invForm.quantity),
             min_stock: parseInt(invForm.min_stock),
-            category: invForm.category
+            category: invForm.category as any
         });
         setIsInvModalOpen(false);
     };

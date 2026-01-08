@@ -33,6 +33,7 @@ export interface Incident {
     targetRole: IncidentRole;
     status: IncidentStatus;
     submittingGroup?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
     category: 'MAINTENANCE' | 'GUEST_REQ' | 'SUPPLY' | 'PREVENTIVE';
 }
 
@@ -87,7 +88,7 @@ export interface InventoryItemData {
     min_stock?: number;
 }
 
-export type CleaningType = 'DEPARTURE' | 'PREARRIVAL' | 'WEEKLY' | 'HOLDOVER' | 'RUBBISH' | 'DAYUSE' | 'STAYOVER';
+export type CleaningType = 'DEPARTURE' | 'PREARRIVAL' | 'WEEKLY' | 'HOLDOVER' | 'RUBBISH' | 'DAYUSE';
 
 export type GuestStatus = 'IN_ROOM' | 'OUT' | 'GUEST_IN_ROOM' | 'GUEST_OUT' | 'NO_GUEST' | 'DND';
 
@@ -122,10 +123,17 @@ export interface Room {
         checkOutDate?: string;
         checkInDate?: string;
         nextArrival?: string;
-        nextGuest?: string;
+        next_arrival_time?: string;
+        nextGuest?: string; // Added for RoomDetailScreen
     };
-    // Advanced Features
-    isGuestWaiting?: boolean;
+    // Assignment
+    assigned_cleaner?: number;
+    assigned_cleaner_name?: string;
+    supplies_used?: Record<string, number>;
+    isGuestWaiting?: boolean; // Added for RoomDetailScreen
+
+    // Frontend helper
+    isDraft?: boolean;
     lastDndTimestamp?: string;
     lastInspectionReport?: any;
 }
@@ -233,7 +241,9 @@ interface HotelContextType {
     deleteCleaningType: (id: number) => Promise<void>;
 
     // Room Move
-    moveGuest: (fromRoomId: string, toRoomId: string) => Promise<void>;
+    moveGuest: (fromRoomId: string, toRoomId: string, updateConfig?: boolean) => Promise<void>;
+    assignRoomsDaily: () => Promise<void>;
+    updateSupplies: (roomId: string, supplies: Record<string, number>) => Promise<void>;
 
     // Phase 2: Major Enhancements
     lostItems: LostItem[];
@@ -257,6 +267,7 @@ interface HotelContextType {
     // Offline Support
     isOffline: boolean;
     isQueueProcessing: boolean;
+    queue: any[];
 }
 
 export interface CleaningTypeDefinition {
@@ -281,8 +292,7 @@ const DEFAULT_SETTINGS: HotelSettings = {
         WEEKLY: 45,
         HOLDOVER: 10,
         RUBBISH: 5,
-        DAYUSE: 15,
-        STAYOVER: 20
+        DAYUSE: 15
     },
     themeColor: 'BLUE'
 };
@@ -430,12 +440,20 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 guestStatus: r.guest_status,
                 receptionPriority: 0, // Mock
                 assignedGroup: r.assigned_group,
+                assigned_cleaner: r.assigned_cleaner, // Correctly mapped
                 configuration: {
                     beds: r.bed_setup,
                     extras: r.extras_text ? r.extras_text.split(',') : []
                 },
                 lastInspection: r.last_inspection_report
             }));
+
+            // console.log("FETCH ROOMS SUCCESS. Count:", transformed.length);
+            // const r16 = transformed.find((r: any) => r.number === '16');
+            // console.log("DEBUG ROOM 16:", JSON.stringify(r16));
+            // if (transformed.length > 0) {
+            //     console.log("Sample Room 0:", JSON.stringify(transformed[0]));
+            // }
 
             // Fetch incidents (could be optimized)
             try {
@@ -486,6 +504,8 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             const role = user.role || '';
             if (['RECEPTION', 'ADMIN', 'SUPERVISOR'].includes(role)) {
                 if (typeof fetchLostItems === 'function') fetchLostItems();
+                // Fetch Staff for Team Dashboard
+                if (typeof fetchStaff === 'function') fetchStaff();
             }
 
             // POLLING
@@ -641,6 +661,17 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         } catch (e: any) {
             console.error("Failed to update room details", e);
             Alert.alert("Error", e.response?.data ? JSON.stringify(e.response.data) : "Failed to update details");
+            fetchRooms(); // Revert
+        }
+    };
+
+    const updateSupplies = async (roomId: string, supplies: Record<string, number>) => {
+        // Optimistic
+        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, supplies_used: supplies } : r));
+        try {
+            await api.patch(`/housekeeping/rooms/${roomId}/`, { supplies_used: supplies });
+        } catch (error) {
+            console.error(error);
             fetchRooms(); // Revert
         }
     };
@@ -1176,6 +1207,18 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
+    const assignRoomsDaily = async () => {
+        try {
+            const response = await api.post('/housekeeping/assign-rooms/assign_daily/');
+            await fetchRooms();
+            showToast(response.data.message || "Rooms distributed successfully", "SUCCESS");
+        } catch (e: any) {
+            console.error(e);
+            const msg = e.response?.data?.error || "Failed to assign rooms";
+            Alert.alert("Assignment Failed", msg);
+        }
+    };
+
     const updateAssetStatus = async (id: number, status: Asset['status']) => {
         try {
             await api.patch(`/housekeeping/assets/${id}/`, { status });
@@ -1203,6 +1246,20 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const submitInspection = async (roomId: string, report: any) => {
+        // Optimistic Update
+        setRooms(prev => prev.map(room =>
+            room.id === roomId ? { ...room, status: 'COMPLETED', lastInspectionReport: report, lastUpdated: new Date().toISOString() } : room
+        ));
+
+        if (isOffline) {
+            queueAction('UPDATE_ROOM', {
+                id: roomId,
+                data: { status: 'COMPLETED', last_inspection_report: report }
+            });
+            addLog(`Inspection completed (Offline) for Room ${roomId}`, 'STATUS');
+            return;
+        }
+
         try {
             await api.patch(`/housekeeping/rooms/${roomId}/`, {
                 status: 'COMPLETED',
@@ -1210,7 +1267,13 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             });
             fetchRooms();
             addLog(`Inspection completed for Room ${roomId}`, 'STATUS');
-        } catch (e) { console.error(e); Alert.alert("Error", "Failed to submit inspection"); }
+        } catch (e) {
+            console.error(e);
+            // Only alert if we failed and we are NOT offline (though that case is handled above)
+            // If API fails for other reasons, we might want to revert logic, but for now we keep it simple
+            Alert.alert("Error", "Failed to submit inspection");
+            fetchRooms(); // Cloud sync to revert if needed
+        }
     };
 
     const getStats = () => {
@@ -1245,12 +1308,14 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             addStaff, updateStaff,
             inventory, fetchInventory, addInventoryItem, deleteInventoryItem, updateInventoryQuantity,
             cleaningTypes, fetchCleaningTypes, addCleaningType, deleteCleaningType, moveGuest,
-            // New Features
+            assignRoomsDaily, updateSupplies,
+
+            // Phase 2
             lostItems, fetchLostItems, reportLostItem, updateLostItemStatus,
             announcements, fetchAnnouncements, sendAnnouncement,
             assets, fetchAssets, addAsset, updateAssetStatus,
             fetchAnalytics, submitInspection,
-            isOffline, isQueueProcessing
+            isOffline, isQueueProcessing, queue
         }}>
             {children}
         </HotelContext.Provider>

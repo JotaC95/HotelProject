@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAuthToken(token);
 
             const loggedInUser: User = {
-                id: response.data.id,
+                id: response.data.user_id, // Mapped from backend 'user_id'
                 username,
                 role: role as UserRole,
                 name: name,

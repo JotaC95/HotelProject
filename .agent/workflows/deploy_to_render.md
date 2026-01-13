@@ -24,6 +24,7 @@ git push origin main
 3.  Fill in the details:
     -   **Name**: `hotel-backend` (or similar)
     -   **Region**: Choose closest to you (e.g. Frankfurt, Ohio).
+    -   **Root Directory**: `HotelBackend` (Important!)
     -   **Runtime**: `Python 3`
     -   **Build Command**: `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate`
     -   **Start Command**: `gunicorn hotel_backend.wsgi:application --log-file -`
@@ -34,7 +35,7 @@ Scroll down to "Environment Variables" and add these keys:
 
 | Key | Value |
 | :--- | :--- |
-| `PYTHON_VERSION` | `3.10.12` (or latest supported) |
+| `PYTHON_VERSION` | `3.12.0` (Required for Django 6.0) |
 | `SECRET_KEY` | (Generate a random string, e.g. `django-insecure-...`) |
 | `DEBUG` | `False` |
 
@@ -50,3 +51,17 @@ Update your React Native `api.ts` file with this new URL.
 // src/services/api.ts
 const BASE_URL = 'https://hotel-backend.onrender.com/api';
 ```
+
+## 7. Create Superuser (Admin) - Automated Method
+Since Render's free tier shell has limitations, we'll use Environment Variables.
+
+1.  In Render Dashboard, go to **Environment**.
+2.  Add: `ADMIN_USER` = `admin` (or your choice)
+3.  Add: `ADMIN_PASS` = `your_secure_password`
+4.  Commit and Push the provided `ensure_admin` command.
+5.  **Build Command Update**: Change the "Build Command" in Render Settings to:
+    `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py ensure_admin`
+    *(We added `&& python manage.py ensure_admin` at the end)*
+    
+6.  Trigger a new Deploy. Your superuser will be created automatically.
+7.  Log in at: `https://hotel-backend-ql8r.onrender.com/admin/`

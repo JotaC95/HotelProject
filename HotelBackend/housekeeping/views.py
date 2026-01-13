@@ -10,7 +10,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import CleaningSession
 from .serializers import CleaningSessionSerializer
-
+from .models import CleaningSession
+from .serializers import CleaningSessionSerializer
+from django.utils import timezone
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().order_by('name')
     serializer_class = InventoryItemSerializer
@@ -30,6 +32,8 @@ class RoomViewSet(viewsets.ModelViewSet):
              
         return queryset 
 
+ 
+
     def perform_update(self, serializer):
         # Capture previous status
         instance = self.get_object()
@@ -40,6 +44,14 @@ class RoomViewSet(viewsets.ModelViewSet):
         
         # logic for notifications
         if old_status != new_status:
+            # Sync Timer Logic
+            if new_status == 'IN_PROGRESS':
+                updated_room.cleaning_started_at = timezone.now()
+                updated_room.save() # Save timestamp
+            elif new_status == 'PENDING':
+                updated_room.cleaning_started_at = None
+                updated_room.save()
+
             if new_status == 'INSPECTION':
                 self.send_notification("Room Ready for Inspection", f"Room {updated_room.number} is ready.", role='SUPERVISOR')
             elif new_status == 'COMPLETED':

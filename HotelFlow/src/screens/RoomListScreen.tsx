@@ -392,6 +392,11 @@ export default function RoomListScreen() {
                     score += 100; // Penalize Heavily -> Moves to bottom (Score 101/102)
                 }
 
+                // NEW: Push Completed/Inspection to absolute bottom (User Request: "ubiquen al final")
+                if (r.status === 'COMPLETED' || r.status === 'INSPECTION') {
+                    score += 2000;
+                }
+
                 return score;
             };
 
@@ -617,8 +622,8 @@ export default function RoomListScreen() {
             {/* Dashboard Header - Role Specific */}
             <DashboardHeader />
 
-            {/* Active Session Timer */}
-            {(isCleaner || isSupervisor) && <TimerDisplay totalMinutes={session.totalMinutes} />}
+            {/* Active Session Timer - Removed to avoid duplicate. Now inside DashboardHeader. */}
+            {/* {(isCleaner || isSupervisor) && <TimerDisplay totalMinutes={session.totalMinutes} />} */}
 
             {/* Offline Banner */}
             {isOffline && (

@@ -33,21 +33,41 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
 
     const stripColor = getBorderColor();
 
+    // Blocking Logic
+    const isGuestIn = room.guestStatus === 'GUEST_IN_ROOM';
+    // Block if Guest is IN (except for Weekly/Rubbish/Stayover maybe? User said "Departure" logic specifically)
+    // Actually, for DEPARTURE and PREARRIVAL/TURNOVER, if Guest is In, we can't clean.
+    // For Stayover (Rubbish/Weekly), we might clean with guest in (or they are usually out, but not strictly blocked).
+    // User complaint: "Blocks ALL prearrival". If PreArrival has guestStatus='GUEST_IN_ROOM', it should be blocked.
+    // If it has 'NO_GUEST', it should NOT be blocked.
+
+    // Let's refine:
+    const requiresEmptyRoom = ['DEPARTURE', 'PREARRIVAL', 'TURNOVER'].includes(room.cleaningType);
+    const isBlockedByGuest = requiresEmptyRoom && isGuestIn;
+
     return (
         <TouchableOpacity
             style={[
                 styles.card,
                 { borderLeftColor: stripColor, borderLeftWidth: 6 },
+                isBlockedByGuest && { opacity: 0.6, backgroundColor: '#f9f9f9' }, // Visual cue for blocked
                 style
             ]}
             onPress={onPress}
             activeOpacity={0.7}
         >
-            {/* Status & Priority Banner - Absolute Top Right if needed, or inline */}
+            {/* Status & Priority Banner */}
             {room.isGuestWaiting && (
                 <View style={styles.rushBanner}>
                     <AlertTriangle size={12} color="white" />
                     <Text style={styles.rushText}>GUEST WAITING</Text>
+                </View>
+            )}
+
+            {/* Blocked Overlay (Optional - or just opacity) */}
+            {isBlockedByGuest && (
+                <View style={{ position: 'absolute', top: 10, right: 10, zIndex: 1, backgroundColor: theme.colors.warning, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>GUEST IN ROOM</Text>
                 </View>
             )}
 
@@ -92,7 +112,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
 
                     <View style={{ gap: 8 }}>
                         {/* Linen Request Button - Only for Departures/Pending */}
-                        {room.cleaningType === 'DEPARTURE' && room.status === 'PENDING' && (
+                        {room.cleaningType === 'DEPARTURE' && room.status === 'PENDING' && !isBlockedByGuest && (
                             <TouchableOpacity
                                 style={[styles.quickActionButton, { backgroundColor: theme.colors.warning }]}
                                 onPress={() => {
@@ -126,7 +146,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
                         )}
 
                         {/* Guest Left Button */}
-                        {room.guestStatus === 'GUEST_IN_ROOM' && (
+                        {isGuestIn && (
                             <View style={{ flexDirection: 'row', gap: 8 }}>
                                 <TouchableOpacity
                                     style={[styles.quickActionButton, { backgroundColor: theme.colors.info }]}
@@ -139,7 +159,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
                                                 {
                                                     text: "Yes, Guest Left",
                                                     onPress: () => {
-                                                        updateGuestStatus(room.id, 'OUT');
+                                                        updateGuestStatus(room.id, 'GUEST_OUT');
                                                         Alert.alert("Updated", "Room marked as Guest Out.");
                                                     }
                                                 }
@@ -185,7 +205,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
                         )}
 
                         {/* Guest IN Button (For Safety/Error Correction) */}
-                        {room.guestStatus === 'NO_GUEST' && (
+                        {!isGuestIn && room.guestStatus !== 'DND' && (
                             <TouchableOpacity
                                 style={[styles.quickActionButton, { backgroundColor: theme.colors.warning }]}
                                 onPress={() => {
@@ -208,7 +228,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
                         )}
 
                         {/* Quick Action Button */}
-                        {onQuickAction && room.status !== 'INSPECTION' && (
+                        {onQuickAction && room.status !== 'INSPECTION' && !isBlockedByGuest && (
                             <TouchableOpacity
                                 style={[styles.quickActionButton, { backgroundColor: room.status === 'PENDING' ? theme.colors.primary : theme.colors.success }]}
                                 onPress={onQuickAction}
@@ -229,7 +249,7 @@ export const RoomCard: React.FC<Props> = ({ room, onPress, showGroup, onQuickAct
                 {/* Footer: Icons & Floor */}
                 <View style={styles.footer}>
                     <View style={styles.icons}>
-                        {room.guestStatus === 'GUEST_IN_ROOM' && (
+                        {isGuestIn && (
                             <View style={[styles.iconTag, { backgroundColor: theme.colors.warning + '20' }]}>
                                 <UserCheck size={12} color={theme.colors.warning} />
                                 <Text style={[styles.iconText, { color: theme.colors.warning }]}>Guest In</Text>

@@ -131,14 +131,17 @@ export interface Room {
     assigned_cleaner_name?: string;
     supplies_used?: Record<string, number>;
     isGuestWaiting?: boolean; // Added for RoomDetailScreen
+    cleaningStartedAt?: string; // Shared Timer from Server
 
     // Frontend helper
     isDraft?: boolean;
     lastDndTimestamp?: string;
     lastInspectionReport?: any;
+    isHousemanCompleted?: boolean;
 }
 
 export interface HotelSettings {
+
     timeEstimates: Record<CleaningType, number>;
     themeColor: 'BLUE' | 'ORANGE' | 'GREEN';
 }
@@ -268,6 +271,13 @@ interface HotelContextType {
     isOffline: boolean;
     isQueueProcessing: boolean;
     queue: any[];
+
+
+    // Cleaning Persistence
+    roomDrafts: Record<string, { notes: string, incident: string }>;
+    startCleaning: (roomId: string) => Promise<void>;
+    stopCleaning: (roomId: string) => Promise<void>;
+    saveDraft: (roomId: string, data: { notes: string, incident: string }) => void;
 }
 
 export interface CleaningTypeDefinition {
@@ -318,6 +328,43 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isOffline, setIsOffline] = useState(false);
     const [queue, setQueue] = useState<any[]>([]);
     const [isQueueProcessing, setIsQueueProcessing] = useState(false);
+
+
+    // Persistence State (Drafts Only - Timer is now Server Synced)
+    const [roomDrafts, setRoomDrafts] = useState<Record<string, { notes: string, incident: string }>>({});
+
+    // Load Persistence Data
+    useEffect(() => {
+        const loadPersistence = async () => {
+            try {
+                const drafts = await AsyncStorage.getItem('roomDrafts');
+                if (drafts) setRoomDrafts(JSON.parse(drafts));
+            } catch (e) {
+                console.error("Failed to load persistence data", e);
+            }
+        };
+        loadPersistence();
+    }, []);
+
+    const startCleaning = async (roomId: string) => {
+        // Optimistic Update: Set cleaningStartedAt to NOW
+        const now = new Date().toISOString();
+        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: 'IN_PROGRESS', cleaningStartedAt: now } : r));
+        updateRoomStatus(roomId, 'IN_PROGRESS');
+    };
+
+    const stopCleaning = async (roomId: string) => {
+        // No local timer cleanup needed anymore
+        // Status update handled by caller
+    };
+
+    const saveDraft = (roomId: string, data: { notes: string, incident: string }) => {
+        setRoomDrafts(prev => {
+            const next = { ...prev, [roomId]: data };
+            AsyncStorage.setItem('roomDrafts', JSON.stringify(next));
+            return next;
+        });
+    };
 
     // Initial Load & Network Listener
     useEffect(() => {
@@ -445,7 +492,9 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     beds: r.bed_setup,
                     extras: r.extras_text ? r.extras_text.split(',') : []
                 },
-                lastInspection: r.last_inspection_report
+                cleaningStartedAt: r.cleaning_started_at,
+                lastInspection: r.last_inspection_report,
+                isHousemanCompleted: r.is_houseman_completed || false
             }));
 
             // console.log("FETCH ROOMS SUCCESS. Count:", transformed.length);
@@ -654,6 +703,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             if (updates.guestDetails?.checkInDate) payload.check_in_date = updates.guestDetails.checkInDate;
             if (updates.guestDetails?.checkOutDate) payload.check_out_date = updates.guestDetails.checkOutDate;
             if (updates.guestDetails?.nextArrival) payload.next_arrival_time = updates.guestDetails.nextArrival;
+            if (updates.isHousemanCompleted !== undefined) payload.is_houseman_completed = updates.isHousemanCompleted;
 
             await api.patch(`/housekeeping/rooms/${id}/`, payload);
             addLog(`Room details updated for ${id}`, 'NOTE');
@@ -765,7 +815,8 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }));
     };
 
-    const updateGuestStatus = (id: string, status: GuestStatus, keysFound?: boolean) => {
+    const updateGuestStatus = async (id: string, status: GuestStatus, keysFound?: boolean) => {
+        // Optimistic Update
         setRooms(prev => prev.map(room => {
             if (room.id === id) {
                 const keysMsg = keysFound !== undefined ? ` (Keys Found: ${keysFound})` : '';
@@ -779,6 +830,16 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             }
             return room;
         }));
+
+        try {
+            const payload: any = { guest_status: status };
+            if (keysFound !== undefined) payload.keys_found = keysFound;
+
+            await api.patch(`/housekeeping/rooms/${id}/`, payload);
+        } catch (e) {
+            console.error("Failed to update guest status", e);
+            fetchRooms(); // Revert on failure
+        }
     };
 
     const setPriority = async (id: string, isPriority: boolean) => {
@@ -1314,8 +1375,17 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             lostItems, fetchLostItems, reportLostItem, updateLostItemStatus,
             announcements, fetchAnnouncements, sendAnnouncement,
             assets, fetchAssets, addAsset, updateAssetStatus,
-            fetchAnalytics, submitInspection,
-            isOffline, isQueueProcessing, queue
+            fetchAnalytics,
+
+            submitInspection,
+            // Persistence Expose
+            roomDrafts,
+            startCleaning,
+            stopCleaning,
+            saveDraft,
+            isOffline,
+            isQueueProcessing,
+            queue
         }}>
             {children}
         </HotelContext.Provider>

@@ -97,6 +97,8 @@ class Room(models.Model):
     
     # Supplies Tracker
     supplies_used = models.JSONField(default=dict, blank=True) # Stores { "Shampoo": 2, "Coffee": 1 }
+    cleaning_started_at = models.DateTimeField(blank=True, null=True) # Shared Timer Timestamp
+    is_houseman_completed = models.BooleanField(default=False) # Helper/Houseman status
 
     def __str__(self):
         return f"Room {self.number} ({self.status}) - {self.assigned_group}"

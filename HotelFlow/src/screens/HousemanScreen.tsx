@@ -272,54 +272,72 @@ export default function HousemanScreen() {
 
     const renderLinen = () => {
         // Calculator Logic
+        // Calculator Logic
         let sheetSingle = 0;
         let sheetDouble = 0;
         let pillowCases = 0;
-        let bathTowels = 0;
+        let largeTowels = 0;
         let handTowels = 0;
+        let faceTowels = 0;
         let bathMats = 0;
 
         const DEPARTURE = 'DEPARTURE';
         const STAYOVER = 'STAYOVER';
 
         rooms.forEach(room => {
-            const isDeparture = room.cleaningType === DEPARTURE || room.status === 'COMPLETED'; // Assuming COMPLETED were departures
-            const isStayover = room.cleaningType === STAYOVER || room.cleaningType === 'DAYUSE'; // 'Day Use' maps to light clean
+            const isDeparture = room.cleaningType === DEPARTURE || room.status === 'COMPLETED';
+            const isStayover = ['WEEKLY', 'HOLDOVER', 'RUBBISH', 'DAYUSE'].includes(room.cleaningType);
 
-            // Bed Configuration Logic (simplified)
-            // Assuming "Single" = 1 Single Bed, "Double" = 1 King/Double, "Suite" = 2 Doubles
+            // Bed Configuration Parsing
+            // Examples: "1 King", "2 Singles", "1 Queen, 1 Single", "Standard"
             let beds = { single: 0, double: 0 };
-            if (room.type === 'Single') beds.single = 1;
-            else if (room.type === 'Double') beds.double = 1;
-            else if (room.type === 'Suite') beds.double = 2;
+            const bedConfig = (room.configuration?.beds || '').toLowerCase();
 
-            // Override with actual config if available
-            // "1 King", "2 Singles", etc. parsing could be done here but let's stick to Room Type proxy for now.
+            if (bedConfig.includes('king') || bedConfig.includes('queen') || bedConfig.includes('double')) {
+                const match = bedConfig.match(/(\d+)\s*(king|queen|double)/);
+                beds.double += match ? parseInt(match[1]) : 1;
+            }
+            if (bedConfig.includes('single') || bedConfig.includes('twin')) {
+                const match = bedConfig.match(/(\d+)\s*(single|twin)/);
+                beds.single += match ? parseInt(match[1]) : 1;
+            }
+            // Fallback if parsing failed but room type exists
+            if (beds.single === 0 && beds.double === 0) {
+                if (room.type === 'Single') beds.single = 1;
+                else if (room.type === 'Double') beds.double = 1;
+                else if (room.type === 'Suite') beds.double = 2;
+                else beds.double = 1; // Default
+            }
 
-            // Logic:
-            // Departure: Change ALL sheets + ALL towels
-            // Stayover: Change towels ONLY (unless requested otherwise - ignored for MVP)
+            // Calculation Constants
+            // Double Bed: 2 Sheets (Top/Bottom), 4 Pillows (Standard hotel), 2 Guests capacity
+            // Single Bed: 2 Sheets, 2 Pillows, 1 Guest capacity
+
+            const guestsCapacity = (beds.double * 2) + beds.single;
 
             if (isDeparture) {
-                sheetSingle += beds.single * 2; // Top + Bottom
+                // Change Sheets
+                sheetSingle += beds.single * 2;
                 sheetDouble += beds.double * 2;
-                pillowCases += (beds.single * 1) + (beds.double * 2); // 1 per single, 2 per double
-                bathMats += 1;
+                pillowCases += (beds.single * 2) + (beds.double * 4);
             }
 
             if (isDeparture || isStayover) {
-                // Towels replaced for both (assuming used)
-                bathTowels += (beds.single * 1) + (beds.double * 2);
-                handTowels += (beds.single * 1) + (beds.double * 2);
+                // Change Towels (Full Set)
+                largeTowels += guestsCapacity;
+                handTowels += guestsCapacity;
+                faceTowels += guestsCapacity;
+                bathMats += 1; // 1 per room
             }
         });
 
         const items = [
-            { label: 'King Sheets', count: sheetDouble, sub: 'Top + Bottom' },
+            { label: 'King/Queen Sheets', count: sheetDouble, sub: 'Top + Bottom' },
             { label: 'Single Sheets', count: sheetSingle, sub: 'Top + Bottom' },
             { label: 'Pillow Cases', count: pillowCases, sub: 'Standard' },
-            { label: 'Bath Towels', count: bathTowels, sub: '1 per Guest' },
+            { label: 'Large Towels', count: largeTowels, sub: '1 per Guest' },
             { label: 'Hand Towels', count: handTowels, sub: '1 per Guest' },
+            { label: 'Face Towels', count: faceTowels, sub: '1 per Guest' },
             { label: 'Bath Mats', count: bathMats, sub: '1 per Room' },
         ];
 

@@ -43,7 +43,20 @@ Scroll down to "Environment Variables" and add these keys:
 Click **Create Web Service**. Render will start building your app.
 Wait for it to show "Live".
 
-## 6. Connect Mobile App
+
+## 6. Configurar Base de Datos Real (IMPORTANTE)
+Si usas Render gratis sin configurar esto, **tus datos se borrarán cada vez que se reinicie**.
+
+1.  En Render, haz clic en **New +** -> **PostgreSQL**.
+2.  Ponle un nombre (ej. `hotel-db`) y dale a **Create Database** (Free Plan).
+3.  Espera a que se cree y **copia la "Internal Database URL"** (empieza por `postgres://...`).
+4.  Ve a tu Servicio Web (`hotel-backend`) -> **Environment**.
+5.  Añade una variable:
+    *   Key: `DATABASE_URL`
+    *   Value: (Pega la URL que copiaste).
+6.  Render reiniciará tu app automáticamente. Ahora tus datos estarán seguros.
+
+## 7. Connect Mobile App
 Once deployed, copy your new URL (e.g., `https://hotel-backend.onrender.com`).
 Update your React Native `api.ts` file with this new URL.
 

@@ -60,8 +60,8 @@ Since Render's free tier shell has limitations, we'll use Environment Variables.
 3.  Add: `ADMIN_PASS` = `your_secure_password`
 4.  Commit and Push the provided `ensure_admin` command.
 5.  **Build Command Update**: Change the "Build Command" in Render Settings to:
-    `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py ensure_admin`
-    *(We added `&& python manage.py ensure_admin` at the end)*
+    `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py ensure_admin && python manage.py populate_rooms`
+    *(Added populate_rooms to generate data if empty)*
     
 6.  Trigger a new Deploy. Your superuser will be created automatically.
 7.  Log in at: `https://hotel-backend-ql8r.onrender.com/admin/`

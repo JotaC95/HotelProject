@@ -2,17 +2,15 @@ import random
 from django.core.management.base import BaseCommand
 from housekeeping.models import Room, CleaningTypeDefinition
 from datetime import date, timedelta
-from faker import Faker
-
-fake = Faker()
 
 class Command(BaseCommand):
-    help = 'Populates the database with 62 random rooms'
+    help = 'Populates the database with 62 random rooms. Skips if rooms exist.'
 
     def handle(self, *args, **kwargs):
-        self.stdout.write('Clearing existing rooms...')
-        Room.objects.all().delete()
-        
+        if Room.objects.exists():
+            self.stdout.write(self.style.WARNING('Rooms already populate. Skipping to prevent data loss.'))
+            return
+
         self.stdout.write('Seeding rooms 1 to 62...')
         
         # Ensure cleaning types exist
@@ -44,7 +42,7 @@ class Command(BaseCommand):
                 check_in = None
                 check_out = None
             else:
-                current_guest = fake.name()
+                current_guest = f"Guest {room_number}"
                 check_in = date.today() - timedelta(days=random.randint(0, 5))
                 check_out = date.today() + timedelta(days=random.randint(1, 4))
             

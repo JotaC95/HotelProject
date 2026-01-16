@@ -40,6 +40,217 @@ const Stopwatch = ({ startTime }: { startTime?: string }) => {
 
 // CHECKLIST REMOVED AS PER USER REQUEST
 
+// --- Role Specific Views ---
+
+const ReceptionView = ({ room, onAction, onUpdateGuest }: { room: Room, onAction: (type: string) => void, onUpdateGuest: (status: string) => void }) => {
+    // Mock Payment Data
+    const balance = Math.floor(Math.random() * 200);
+
+    return (
+        <ScrollView style={styles.roleContainer}>
+            <View style={styles.roleHeader}>
+                <View>
+                    <Text style={styles.roleTitle}>Room {room.number}</Text>
+                    <Text style={styles.roleSubtitle}>{room.type} • {room.floor}th Floor</Text>
+                </View>
+                <StatusBadge status={room.status} />
+            </View>
+
+            {/* Guest Card */}
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <User size={20} color={theme.colors.primary} />
+                    <Text style={styles.cardTitle}>Guest Information</Text>
+                </View>
+                {room.guestDetails?.currentGuest ? (
+                    <View>
+                        <Text style={styles.guestName}>{room.guestDetails.currentGuest}</Text>
+                        <Text style={styles.guestDates}>Departs: {new Date(room.guestDetails.nextArrival || Date.now()).toLocaleDateString()}</Text>
+
+                        <View style={styles.buttonRow}>
+                            <TouchableOpacity style={styles.actionBtnOutline} onPress={() => onUpdateGuest('OUT')}>
+                                <LogOut size={16} color={theme.colors.primary} />
+                                <Text style={styles.btnTextPrimary}>Check Out</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.actionBtnOutline}>
+                                <Phone size={16} color={theme.colors.primary} />
+                                <Text style={styles.btnTextPrimary}>Call Room</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>Room is Vaccant</Text>
+                        <TouchableOpacity style={styles.actionBtnFull} onPress={() => onUpdateGuest('IN')}>
+                            <LogIn size={16} color="white" />
+                            <Text style={styles.btnTextWhite}>Check In Guest</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+
+            {/* Payment & Billing */}
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <Briefcase size={20} color={theme.colors.secondary} />
+                    <Text style={styles.cardTitle}>Billing</Text>
+                </View>
+                <View style={styles.billingRow}>
+                    <Text style={styles.billingLabel}>Pending Balance</Text>
+                    <Text style={[styles.billingValue, { color: balance > 0 ? theme.colors.error : theme.colors.success }]}>
+                        ${balance}.00
+                    </Text>
+                </View>
+                {balance > 0 && (
+                    <TouchableOpacity style={styles.payBtn}>
+                        <Text style={styles.payBtnText}>Process Payment</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* Room Status Actions */}
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <History size={20} color={theme.colors.text} />
+                    <Text style={styles.cardTitle}>Housekeeping Status</Text>
+                </View>
+                <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>Current: {room.status}</Text>
+                    <TouchableOpacity onPress={() => onAction('PRIORITY')} style={styles.priorityBtn}>
+                        <Text style={styles.priorityText}>Mark High Priority</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </ScrollView>
+    );
+};
+
+const SupervisorView = ({ room, onAction }: { room: Room, onAction: (type: string) => void }) => {
+    return (
+        <ScrollView style={styles.roleContainer}>
+            <View style={styles.roleHeader}>
+                <View>
+                    <Text style={styles.roleTitle}>Audit Room {room.number}</Text>
+                    <Text style={styles.roleSubtitle}>Supervisor Inspection</Text>
+                </View>
+                <StatusBadge status={room.status} />
+            </View>
+
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <ClipboardCheck size={20} color={theme.colors.primary} />
+                    <Text style={styles.cardTitle}>Inspection Checklist</Text>
+                </View>
+                <View style={{ gap: 10 }}>
+                    {['Bed Made properly', 'Bathroom Cleaned', 'Amenities Restocked', 'Floor Vacuumed', 'No Dust'].map((item, i) => (
+                        <View key={i} style={styles.checklistItem}>
+                            <View style={styles.checkbox}><Check size={14} color="gray" /></View>
+                            <Text style={styles.checklistText}>{item}</Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+
+            <View style={styles.buttonRow}>
+                <TouchableOpacity style={[styles.actionBtnFull, { backgroundColor: theme.colors.success }]} onPress={() => onAction('APPROVE')}>
+                    <CheckCircle2 size={20} color="white" />
+                    <Text style={styles.btnTextWhite}>Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtnFull, { backgroundColor: theme.colors.error }]} onPress={() => onAction('REJECT')}>
+                    <XCircle size={20} color="white" />
+                    <Text style={styles.btnTextWhite}>Reject</Text>
+                </TouchableOpacity>
+            </View>
+        </ScrollView>
+    );
+};
+
+const MaintenanceView = ({ room, onAddIncident, onViewPhoto }: { room: Room, onAddIncident: () => void, onViewPhoto: (uri: string) => void }) => {
+    return (
+        <ScrollView style={styles.roleContainer}>
+            <View style={styles.roleHeader}>
+                <View>
+                    <Text style={styles.roleTitle}>Maintenance Log</Text>
+                    <Text style={styles.roleSubtitle}>Room {room.number}</Text>
+                </View>
+                <TouchableOpacity onPress={onAddIncident} style={styles.iconBtn}>
+                    <Plus size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Asset List */}
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <Wrench size={20} color={theme.colors.text} />
+                    <Text style={styles.cardTitle}>Assets in Room</Text>
+                </View>
+                <View style={{ gap: 8 }}>
+                    <View style={styles.assetItem}>
+                        <View><Text style={styles.assetName}>AC Unit</Text><Text style={styles.assetSerial}>SN: 12345678</Text></View>
+                        <View style={[styles.assetBadge, { backgroundColor: theme.colors.success }]}><Text style={styles.assetStatusText}>Good</Text></View>
+                    </View>
+                    <View style={styles.assetItem}>
+                        <View><Text style={styles.assetName}>TV</Text><Text style={styles.assetSerial}>SN: LG-999</Text></View>
+                        <View style={[styles.assetBadge, { backgroundColor: theme.colors.success }]}><Text style={styles.assetStatusText}>Good</Text></View>
+                    </View>
+                </View>
+            </View>
+
+            {/* Open Tickets */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Open Tickets</Text>
+                {room.incidents.filter(i => i.status === 'OPEN').length === 0 ? (
+                    <Text style={styles.emptyText}>No open tickets.</Text>
+                ) : (
+                    room.incidents.filter(i => i.status === 'OPEN').map((inc, i) => (
+                        <View key={i} style={styles.incidentItem}>
+                            <AlertTriangle size={16} color={theme.colors.error} />
+                            <View style={{ flex: 1, marginLeft: 8 }}>
+                                <Text style={styles.incidentText}>{inc.text}</Text>
+                                {inc.photoUri && (
+                                    <TouchableOpacity onPress={() => onViewPhoto(inc.photoUri!)}>
+                                        <Image source={{ uri: inc.photoUri }} style={{ width: 100, height: 100, borderRadius: 8, marginTop: 4 }} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    ))
+                )}
+            </View>
+        </ScrollView>
+    );
+};
+
+const HousemanView = ({ room }: { room: Room }) => {
+    return (
+        <ScrollView style={styles.roleContainer}>
+            <View style={styles.roleHeader}>
+                <View>
+                    <Text style={styles.roleTitle}>Restock Room {room.number}</Text>
+                    <Text style={styles.roleSubtitle}>{room.type} • {room.configuration?.bedrooms || 1} Bed</Text>
+                </View>
+            </View>
+
+            <View style={styles.roleCard}>
+                <View style={styles.cardHeader}>
+                    <Package size={20} color={theme.colors.primary} />
+                    <Text style={styles.cardTitle}>Required Items</Text>
+                </View>
+                <View style={styles.suppliesGrid}>
+                    <View style={styles.supplyItem}><Text style={styles.supplyLabel}>Towels</Text><Text style={styles.zenInfoValue}>4</Text></View>
+                    <View style={styles.supplyItem}><Text style={styles.supplyLabel}>Soap</Text><Text style={styles.zenInfoValue}>2</Text></View>
+                    <View style={styles.supplyItem}><Text style={styles.supplyLabel}>Gels</Text><Text style={styles.zenInfoValue}>2</Text></View>
+                    <View style={styles.supplyItem}><Text style={styles.supplyLabel}>Water</Text><Text style={styles.zenInfoValue}>2</Text></View>
+                </View>
+            </View>
+            <TouchableOpacity style={styles.actionBtnFull}>
+                <CheckCircle size={20} color="white" />
+                <Text style={styles.btnTextWhite}>Mark Restocked</Text>
+            </TouchableOpacity>
+        </ScrollView>
+    );
+};
+
 export default function RoomDetailScreen() {
     const route = useRoute<RoomDetailRouteProp>();
     const navigation = useNavigation();
@@ -63,6 +274,7 @@ export default function RoomDetailScreen() {
     const [targetRole, setTargetRole] = useState<IncidentRole>('MAINTENANCE'); // Default target
     const [attachedPhoto, setAttachedPhoto] = useState<string | null>(null);
     const [isInspectionVisible, setInspectionVisible] = useState(false);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isHistoryVisible, setHistoryVisible] = useState(false);
 
     // Lost & Found State
@@ -343,7 +555,53 @@ export default function RoomDetailScreen() {
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            {/* ZEN MODE for CLEANERS in IN_PROGRESS */}
+
+            {/* ROLE BASED RENDER */}
+
+            {/* 1. RECEPTION VIEW */}
+            {user?.role === 'RECEPTION' && (
+                <ReceptionView
+                    room={room}
+                    onAction={(type) => {
+                        if (type === 'PRIORITY') Alert.alert("Success", "Priority Updated");
+                    }}
+                    onUpdateGuest={(status) => {
+                        if (status === 'OUT') handleGuestLeft();
+                        else Alert.alert("Check In", "Navigate to Check In Flow");
+                    }}
+                />
+            )}
+
+            {/* 2. SUPERVISOR VIEW */}
+            {user?.role === 'SUPERVISOR' && room.status === 'INSPECTION' && (
+                <SupervisorView
+                    room={room}
+                    onAction={(action) => {
+                        if (action === 'APPROVE') {
+                            updateRoomStatus(room.id, 'COMPLETED');
+                            navigation.goBack();
+                        } else {
+                            handleReject();
+                        }
+                    }}
+                />
+            )}
+
+            {/* 3. MAINTENANCE VIEW */}
+            {user?.role === 'MAINTENANCE' && (
+                <MaintenanceView
+                    room={room}
+                    onAddIncident={() => setIncidentModalVisible(true)}
+                    onViewPhoto={(uri) => setSelectedImage(uri)}
+                />
+            )}
+
+            {/* 4. HOUSEMAN VIEW */}
+            {user?.role === 'HOUSEMAN' && (
+                <HousemanView room={room} />
+            )}
+
+            {/* 5. CLEANER VIEW (Existing Zen Mode) */}
             {(user?.role === 'CLEANER' && room.status === 'IN_PROGRESS') ? (
                 <View style={styles.zenContainer}>
                     {/* Live Timer Header */}
@@ -1091,7 +1349,9 @@ export default function RoomDetailScreen() {
                                                 {new Date(inc.timestamp).toLocaleTimeString()} • {inc.user} • {inc.status}
                                             </Text>
                                             {inc.photoUri && (
-                                                <Image source={{ uri: inc.photoUri }} style={styles.incidentImage} />
+                                                <TouchableOpacity onPress={() => setSelectedImage(inc.photoUri!)}>
+                                                    <Image source={{ uri: inc.photoUri }} style={styles.incidentImage} />
+                                                </TouchableOpacity>
                                             )}
 
                                             {inc.status === 'OPEN' && (
@@ -1232,7 +1492,7 @@ export default function RoomDetailScreen() {
                         <TouchableWithoutFeedback onPress={() => setHistoryVisible(false)}>
                             <View style={styles.modalOverlay}>
                                 <TouchableWithoutFeedback>
-                                    <View style={[styles.modalContent, { maxHeight: '70%' }]}>
+                                    <View style={[styles.modalContent, { maxHeight: '70%', paddingBottom: 30 }]}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                                             <Text style={styles.modalTitle}>History Log</Text>
                                             <TouchableOpacity onPress={() => setHistoryVisible(false)}>
@@ -1260,6 +1520,16 @@ export default function RoomDetailScreen() {
                                 </TouchableWithoutFeedback>
                             </View>
                         </TouchableWithoutFeedback>
+                    </Modal>
+
+                    {/* Photo Lightbox Modal */}
+                    <Modal visible={!!selectedImage} transparent={true} animationType="fade">
+                        <View style={styles.lightboxContainer}>
+                            <TouchableOpacity style={styles.lightboxClose} onPress={() => setSelectedImage(null)}>
+                                <X color="white" size={30} />
+                            </TouchableOpacity>
+                            <Image source={{ uri: selectedImage || '' }} style={styles.lightboxImage} resizeMode="contain" />
+                        </View>
                     </Modal>
                 </>
             )
@@ -2134,4 +2404,166 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
 
+    roleContainer: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
+    roleHeader: {
+        padding: 20,
+        backgroundColor: 'white',
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    roleTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: theme.colors.text
+    },
+    roleSubtitle: {
+        fontSize: 14,
+        color: theme.colors.textSecondary
+    },
+    roleCard: {
+        backgroundColor: 'white',
+        margin: 15,
+        borderRadius: 12,
+        padding: 15,
+        ...theme.shadows.card
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        paddingBottom: 10
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.colors.text
+    },
+    guestName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: theme.colors.text,
+        marginBottom: 4
+    },
+    guestDates: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        marginBottom: 15
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 10
+    },
+    actionBtnOutline: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        gap: 6
+    },
+    actionBtnFull: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 8,
+        backgroundColor: theme.colors.primary,
+        gap: 6
+    },
+    btnTextPrimary: {
+        color: theme.colors.primary,
+        fontWeight: '600'
+    },
+    btnTextWhite: {
+        color: 'white',
+        fontWeight: '600'
+    },
+    emptyState: {
+        alignItems: 'center',
+        padding: 20,
+        gap: 15
+    },
+    billingRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15
+    },
+    billingLabel: {
+        fontSize: 16,
+        color: theme.colors.textSecondary
+    },
+    billingValue: {
+        fontSize: 20,
+        fontWeight: 'bold'
+    },
+    payBtn: {
+        backgroundColor: theme.colors.secondary,
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    payBtnText: {
+        color: 'white',
+        fontWeight: 'bold'
+    },
+    statusRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    statusLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.colors.text
+    },
+    priorityBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: theme.colors.warning + '20',
+        borderRadius: 20
+    },
+    priorityText: {
+        color: theme.colors.warning,
+        fontWeight: 'bold',
+        fontSize: 12
+    },
+    iconBtn: {
+        padding: 8,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8
+    },
+    lightboxContainer: {
+        flex: 1,
+        backgroundColor: 'black',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    lightboxClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        padding: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 20
+    },
+    lightboxImage: {
+        width: '100%',
+        height: '80%'
+    }
 });
+// End of Styles

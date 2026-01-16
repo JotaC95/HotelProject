@@ -23,6 +23,9 @@ export default function HousemanScreen() {
     const [newItemStock, setNewItemStock] = useState('10'); // Default min stock
     const [categoryFilter, setCategoryFilter] = useState('ALL');
 
+    // Runner Mode State
+    const [runnerMode, setRunnerMode] = useState(false);
+
     useEffect(() => {
         fetchSystemIncidents();
         fetchInventory();
@@ -520,5 +523,23 @@ const styles = StyleSheet.create({
     linenCard: { width: '48%', backgroundColor: 'white', padding: 16, borderRadius: 12, ...theme.shadows.card, alignItems: 'center', marginBottom: 12 },
     linenCount: { fontSize: 32, fontWeight: 'bold', color: theme.colors.primary, marginVertical: 8 },
     linenLabel: { fontSize: 14, color: theme.colors.textSecondary, fontWeight: '600' },
-    linenSubtext: { fontSize: 11, color: '#A0AEC0', textAlign: 'center' }
+    linenSubtext: { fontSize: 11, color: '#A0AEC0', textAlign: 'center' },
+
+    // Runner Mode Styles
+    runnerToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2D3748', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24, gap: 8 },
+    runnerToggleText: { color: 'white', fontWeight: 'bold' },
+    runnerHeader: { backgroundColor: '#2D3748', padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    runnerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
+    runnerExitBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 },
+    runnerExitText: { color: 'white', fontWeight: 'bold' },
+    runnerCard: { backgroundColor: 'white', padding: 24, borderRadius: 16, marginBottom: 16, borderColor: '#2D3748', borderWidth: 2, ...theme.shadows.card },
+    runnerCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    runnerRoom: { fontSize: 28, fontWeight: 'bold', color: '#2D3748' },
+    runnerText: { fontSize: 22, fontWeight: '500', color: '#2D3748', marginBottom: 8 },
+    runnerTime: { fontSize: 14, color: '#718096', marginBottom: 24 },
+    runnerActionBtn: { backgroundColor: theme.colors.success, padding: 20, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+    runnerActionText: { color: 'white', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+    runnerEmpty: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
+    runnerEmptyText: { fontSize: 24, fontWeight: 'bold', color: theme.colors.success, marginTop: 16 },
+    runnerEmptySub: { fontSize: 18, color: '#718096' }
 });

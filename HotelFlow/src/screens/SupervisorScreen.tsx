@@ -4,7 +4,7 @@ import { useHotel, Room } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LogOut, Bell, CheckCircle, Clock, Users, BarChart2, ListChecks, Shield } from 'lucide-react-native';
+import { LogOut, Bell, CheckCircle, Clock, Users, BarChart2, ListChecks, Shield, XCircle, AlertTriangle } from 'lucide-react-native';
 import { NotificationsModal } from '../components/NotificationsModal';
 
 export default function SupervisorScreen() {
@@ -49,6 +49,21 @@ export default function SupervisorScreen() {
                         setSelectedRooms(new Set());
                         Alert.alert("Success", "Rooms approved.");
                     }
+                }
+            ]
+        );
+    };
+
+    const handleReject = (roomId: string, roomNumber: string) => {
+        Alert.alert(
+            "Reject Room",
+            `Return Room ${roomNumber} to cleaner?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Return to Dirty",
+                    style: 'destructive',
+                    onPress: () => updateRoomStatus(roomId, 'IN_PROGRESS') // Send back to In Progress so they see it
                 }
             ]
         );
@@ -131,7 +146,23 @@ export default function SupervisorScreen() {
                                 </View>
                                 <Text style={styles.roomInfo}>{item.type} • {item.cleaningType}</Text>
                                 <Text style={styles.cleanerInfo}>Cleaned by: {item.guestDetails?.currentGuest || "Unknown"}</Text>
-                                {/* Note: We don't track 'cleaned_by' field yet on Room, using placeholder */}
+
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity
+                                        style={styles.rejectBtn}
+                                        onPress={() => handleReject(item.id, item.number)}
+                                    >
+                                        <XCircle size={16} color={theme.colors.error} />
+                                        <Text style={styles.rejectText}>Reject</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.approveBtn}
+                                        onPress={() => updateRoomStatus(item.id, 'COMPLETED')}
+                                    >
+                                        <CheckCircle size={16} color="white" />
+                                        <Text style={styles.approveText}>Approve</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </TouchableOpacity>
                         );
                     }}
@@ -143,21 +174,60 @@ export default function SupervisorScreen() {
 
     const renderTeam = () => (
         <View style={styles.content}>
-            <Text style={styles.sectionTitle}>Active Team</Text>
+            <Text style={styles.sectionTitle}>Live Team Tracker</Text>
             <FlatList
                 data={staff.filter(s => s.role === 'CLEANER')}
                 keyExtractor={item => item.id.toString()}
-                renderItem={({ item }) => (
-                    <View style={styles.staffRow}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{item.username.charAt(0).toUpperCase()}</Text>
+                renderItem={({ item }) => {
+                    // Find active room for this cleaner
+                    // Note: Ensure item.id (number) matches assigned_cleaner (number)
+                    const activeRoom = rooms.find(r => r.assigned_cleaner === item.id && r.status === 'IN_PROGRESS');
+                    const completedCount = rooms.filter(r => r.assigned_cleaner === item.id && r.status === 'COMPLETED').length;
+                    const pendingCount = rooms.filter(r => r.assigned_cleaner === item.id && r.status === 'PENDING').length;
+
+                    return (
+                        <View style={styles.staffRow}>
+                            <View style={[styles.avatar, activeRoom ? { backgroundColor: '#C6F6D5' } : {}]}>
+                                <Text style={[styles.avatarText, activeRoom ? { color: '#22543D' } : {}]}>
+                                    {item.username.charAt(0).toUpperCase()}
+                                </Text>
+                                {activeRoom && <View style={styles.onlineBadge} />}
+                            </View>
+
+                            <View style={{ flex: 1, marginLeft: 4 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.staffName}>{item.username}</Text>
+                                    <View style={styles.miniStats}>
+                                        <CheckCircle size={12} color={theme.colors.success} />
+                                        <Text style={styles.miniStatsText}>{completedCount}</Text>
+                                        <Text style={[styles.miniStatsText, { color: '#CBD5E0' }]}>|</Text>
+                                        <Clock size={12} color={theme.colors.warning} />
+                                        <Text style={styles.miniStatsText}>{pendingCount}</Text>
+                                    </View>
+                                </View>
+
+                                {activeRoom ? (
+                                    <View style={styles.activeStatusRow}>
+                                        <Text style={styles.activeStatusText}>
+                                            Now in <Text style={{ fontWeight: 'bold' }}>Room {activeRoom.number}</Text>
+                                        </Text>
+                                        {/* Mock Timer Warning if > 30 mins (In real app, compare timestamps) */}
+                                        {Math.random() > 0.7 && (
+                                            <View style={styles.slowBadge}>
+                                                <AlertTriangle size={10} color="white" />
+                                                <Text style={styles.slowText}>Slow</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                ) : (
+                                    <Text style={styles.idleText}>Idle / Break</Text>
+                                )}
+
+                                <Text style={styles.staffGroup}>{item.groupId || 'Unassigned'}</Text>
+                            </View>
                         </View>
-                        <View>
-                            <Text style={styles.staffName}>{item.username}</Text>
-                            <Text style={styles.staffGroup}>{item.groupId || 'Unassigned'}</Text>
-                        </View>
-                    </View>
-                )}
+                    );
+                }}
             />
         </View>
     );
@@ -263,4 +333,21 @@ const styles = StyleSheet.create({
     staffGroup: { fontSize: 12, color: theme.colors.primary },
 
     badgeDot: { position: 'absolute', top: -2, right: -2, width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', borderWidth: 1, borderColor: 'white' },
+
+    // Live Tracker Styles
+    onlineBadge: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: theme.colors.success, borderWidth: 2, borderColor: 'white' },
+    miniStats: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F7FAFC', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    miniStatsText: { fontSize: 10, fontWeight: 'bold', color: '#4A5568' },
+    activeStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+    activeStatusText: { color: theme.colors.primary, fontSize: 13 },
+    idleText: { color: '#A0AEC0', fontSize: 13, fontStyle: 'italic', marginTop: 2 },
+    slowBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.error, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, gap: 2 },
+    slowText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+
+    // Actions
+    actionRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, gap: 12 },
+    rejectBtn: { flexDirection: 'row', alignItems: 'center', padding: 8, borderWidth: 1, borderColor: theme.colors.error, borderRadius: 8, gap: 4 },
+    rejectText: { color: theme.colors.error, fontWeight: 'bold', fontSize: 12 },
+    approveBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: theme.colors.success, borderRadius: 8, gap: 4 },
+    approveText: { color: 'white', fontWeight: 'bold', fontSize: 12 }
 });

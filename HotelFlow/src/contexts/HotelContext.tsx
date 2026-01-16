@@ -88,7 +88,7 @@ export interface InventoryItemData {
     min_stock?: number;
 }
 
-export type CleaningType = 'DEPARTURE' | 'PREARRIVAL' | 'WEEKLY' | 'HOLDOVER' | 'RUBBISH' | 'DAYUSE';
+export type CleaningType = 'DEPARTURE' | 'PREARRIVAL' | 'WEEKLY' | 'HOLDOVER' | 'RUBBISH' | 'DAYUSE' | 'STAYOVER';
 
 export type GuestStatus = 'IN_ROOM' | 'OUT' | 'GUEST_IN_ROOM' | 'GUEST_OUT' | 'NO_GUEST' | 'DND';
 
@@ -302,7 +302,8 @@ const DEFAULT_SETTINGS: HotelSettings = {
         WEEKLY: 45,
         HOLDOVER: 10,
         RUBBISH: 5,
-        DAYUSE: 15
+        DAYUSE: 15,
+        STAYOVER: 10
     },
     themeColor: 'BLUE'
 };

@@ -4,7 +4,7 @@ import { useHotel, Room, Staff, CleaningType } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { RoomCard } from '../components/RoomCard';
-import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase, Bell, Calendar } from 'lucide-react-native';
+import { Star, LogOut, Download, CheckCircle, Clock, Users, Home, Plus, Wrench, Briefcase, Bell, Calendar, AlertTriangle, Search, Filter, X, Sparkles } from 'lucide-react-native';
 import { NotificationsModal } from '../components/NotificationsModal';
 
 import { useNavigation } from '@react-navigation/native';
@@ -16,7 +16,7 @@ export default function ReceptionScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const { rooms, staff, setPriority, fetchStaff, updateStaffGroup, createRoom, startMaintenance, assignRoomToGroup, announcements, addIncident, resolveIncident, moveGuest } = useHotel(); // Added moveGuest
     const { logout, user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'STAFF' | 'ROOMS' | 'REQUESTS'>('DASHBOARD'); // Added REQUESTS
+    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'STAFF' | 'ROOMS' | 'REQUESTS' | 'TEAMS'>('DASHBOARD'); // Added TEAMS
     const [notificationsVisible, setNotificationsVisible] = useState(false);
     const insets = useSafeAreaInsets();
 
@@ -38,7 +38,7 @@ export default function ReceptionScreen() {
 
     // --- Team Management Logic ---
     const [teamModalVisible, setTeamModalVisible] = useState(false);
-    const [targetId, setTargetId] = useState<string | number | null>(null); // Room ID (string) or Staff ID (number)
+    const [targetId, setTargetId] = useState<string | number | null>(null); // Room ID (string) or Staff ID (number) or 'BULK'
     const [isAssigningStaff, setIsAssigningStaff] = useState(false);
     const [newTeamName, setNewTeamName] = useState('');
 
@@ -46,6 +46,86 @@ export default function ReceptionScreen() {
     const [moveModalVisible, setMoveModalVisible] = useState(false);
     const [moveFromId, setMoveFromId] = useState<string | null>(null);
     const [moveToId, setMoveToId] = useState<string | null>(null);
+
+    // --- Search & Filter State (Reception 2.0) ---
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'DIRTY' | 'INSPECTION' | 'CLEAN' | 'VIP' | 'VACANT'>('ALL');
+
+    // --- Phase 2: Bulk Actions ---
+    const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+    const toggleSelection = (roomId: string) => {
+        if (selectedRooms.includes(roomId)) {
+            const newSelection = selectedRooms.filter(id => id !== roomId);
+            setSelectedRooms(newSelection);
+            if (newSelection.length === 0) setIsSelectionMode(false);
+        } else {
+            setSelectedRooms([...selectedRooms, roomId]);
+            setIsSelectionMode(true);
+        }
+    };
+
+    const handleBulkAssign = (groupName: string) => {
+        selectedRooms.forEach(roomId => {
+            assignRoomToGroup(roomId, groupName);
+        });
+        setIsSelectionMode(false);
+        setSelectedRooms([]);
+        Alert.alert("Success", `Assigned ${selectedRooms.length} rooms to ${groupName}`);
+    };
+
+    const handleBulkPriority = () => {
+        selectedRooms.forEach(roomId => {
+            setPriority(roomId, true);
+        });
+        setIsSelectionMode(false);
+        setSelectedRooms([]);
+        Alert.alert("Success", `Marked ${selectedRooms.length} rooms as Priority`);
+    };
+
+    const handleAutoAssign = () => {
+        // Phase 4: Auto-Assignment Algorithm
+        const unassignedRooms = rooms.filter(r => !r.assignedGroup && (r.status === 'PENDING' || r.status === 'IN_PROGRESS' || r.status === 'INSPECTION'));
+
+        // Extract unique groups from staff
+        const activeGroups = Array.from(new Set(staff.map(s => s.groupId || s.group_id).filter(Boolean))) as string[];
+
+        if (activeGroups.length === 0) {
+            Alert.alert("No Teams", "Please create teams and assign staff before auto-assigning.");
+            return;
+        }
+
+        if (unassignedRooms.length === 0) {
+            Alert.alert("All Clear", "No unassigned rooms to distribute.");
+            return;
+        }
+
+        Alert.alert(
+            "Auto-Assign Rooms",
+            `Distribute ${unassignedRooms.length} rooms across ${activeGroups.length} teams (${activeGroups.join(', ')})?`,
+            [
+                { text: "Cancel", style: 'cancel' },
+                {
+                    text: "Distribute",
+                    onPress: () => {
+                        let assignedCount = 0;
+                        unassignedRooms.forEach((room, index) => {
+                            const team = activeGroups[index % activeGroups.length];
+                            assignRoomToGroup(room.id, team);
+                            assignedCount++;
+                        });
+                        Alert.alert("Success", `Distributed ${assignedCount} rooms.`);
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleClearSelection = () => {
+        setSelectedRooms([]);
+        setIsSelectionMode(false);
+    };
 
     const handleMoveGuest = async () => {
         if (moveFromId && moveToId) {
@@ -122,6 +202,12 @@ export default function ReceptionScreen() {
     };
 
     const handleConfirmAssign = (groupName: string) => {
+        if (targetId === 'BULK') {
+            handleBulkAssign(groupName);
+            setTeamModalVisible(false);
+            return;
+        }
+
         if (!targetId) return;
         if (isAssigningStaff) {
             updateStaffGroup(targetId as number, groupName);
@@ -267,6 +353,91 @@ export default function ReceptionScreen() {
         </ScrollView>
     );
 
+    const renderRoomsByGroup = (groupName: string, groupRooms: Room[]) => {
+        const completed = groupRooms.filter(r => r.status === 'COMPLETED').length;
+        const inspection = groupRooms.filter(r => r.status === 'INSPECTION').length;
+        const total = groupRooms.length;
+        const progress = total > 0 ? (completed / total) : 0;
+
+        // Find staff in this group
+        const groupStaff = staff.filter(s => s.groupId === groupName && s.role === 'CLEANER');
+
+        return (
+            <View style={styles.teamCard}>
+                <View style={styles.teamHeader}>
+                    <View>
+                        <Text style={styles.teamTitle}>{groupName || "Unassigned Rooms"}</Text>
+                        <Text style={styles.teamSubtitle}>
+                            {groupStaff.length > 0
+                                ? `${groupStaff.map(s => s.username).join(', ')}`
+                                : "No cleaners assigned"}
+                        </Text>
+                    </View>
+                    <View style={styles.teamStats}>
+                        <Text style={styles.teamProgressText}>{completed}/{total} Cleaned</Text>
+                        <View style={styles.progressBar}>
+                            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Inspection Alert */}
+                {inspection > 0 && (
+                    <TouchableOpacity style={styles.inspectionAlert} onPress={() => setActiveTab('ROOMS')}>
+                        <AlertTriangle size={16} color="#B7791F" />
+                        <Text style={styles.inspectionText}>{inspection} Rooms waiting for Inspection!</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Mini Room List */}
+                <View style={styles.miniGrid}>
+                    {groupRooms.map(r => (
+                        <TouchableOpacity
+                            key={r.id}
+                            style={[
+                                styles.miniRoomBadge,
+                                { backgroundColor: getStatusColor(r.status) + '20', borderColor: getStatusColor(r.status) }
+                            ]}
+                            onPress={() => navigation.navigate('RoomDetail', { roomId: r.id })}
+                        >
+                            <Text style={[styles.miniRoomText, { color: getStatusColor(r.status) }]}>{r.number}</Text>
+                            {r.status === 'INSPECTION' && <View style={styles.dot} />}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+        );
+    };
+
+    const renderTeams = () => {
+        // defined groups
+        const groups = ['Group 1', 'Group 2', 'Group 3', 'Group 4', 'Group 5']; // Or dynamic
+        const assignedRooms = rooms.filter(r => r.assignedGroup);
+        const unassignedRooms = rooms.filter(r => !r.assignedGroup);
+
+        // Dynamic groups from actual assignments + staff assignments
+        const activeGroups = Array.from(new Set([
+            ...rooms.map(r => r.assignedGroup).filter(Boolean),
+            ...staff.map(s => s.groupId).filter(Boolean)
+        ])).sort();
+
+        return (
+            <ScrollView style={styles.content}>
+                <Text style={styles.sectionTitle}>Team Progress</Text>
+                <Text style={styles.sectionSubtitle}>Monitor cleaning progress by team.</Text>
+
+                {activeGroups.map(group => {
+                    const groupRooms = rooms.filter(r => r.assignedGroup === group);
+                    return <View key={group}>{renderRoomsByGroup(group as string, groupRooms)}</View>;
+                })}
+
+                {unassignedRooms.length > 0 && renderRoomsByGroup("", unassignedRooms)}
+
+                <View style={{ height: 40 }} />
+            </ScrollView>
+        );
+    };
+
     const renderStaff = () => (
         <View style={styles.content}>
             <Text style={styles.sectionTitle}>Staff Management</Text>
@@ -296,6 +467,69 @@ export default function ReceptionScreen() {
         </View>
     );
 
+    const renderMaintenance = () => {
+        // Collect all incidents from rooms
+        const allIncidents = rooms.flatMap(r =>
+            (r.incidents || []).map(inc => ({ ...inc, roomId: r.id, roomNumber: r.number }))
+        ).filter(inc => inc.status === 'OPEN');
+
+        return (
+            <View style={styles.content}>
+                <View style={styles.rowBetween}>
+                    <Text style={styles.sectionTitle}>Maintenance Hub ({allIncidents.length})</Text>
+                </View>
+
+                {allIncidents.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <CheckCircle size={48} color="#C6F6D5" />
+                        <Text style={styles.emptyStateText}>All systems operational!</Text>
+                        <Text style={styles.emptyStateSubtext}>No open maintenance incidents.</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={allIncidents}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                        renderItem={({ item }) => (
+                            <View style={styles.incidentCard}>
+                                <View style={styles.incidentRow}>
+                                    <View style={styles.incidentInfo}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={styles.incidentRoom}>Room {item.roomNumber}</Text>
+                                            {item.priority && (
+                                                <View style={styles.priorityBadge}>
+                                                    <AlertTriangle size={10} color="white" />
+                                                    <Text style={styles.priorityText}>HIGH</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={styles.incidentDesc}>{item.description}</Text>
+                                        <Text style={styles.incidentTime}>{new Date(item.timestamp).toLocaleString()}</Text>
+                                    </View>
+
+                                    <View style={styles.incidentActions}>
+                                        <TouchableOpacity
+                                            style={styles.resolveBtn}
+                                            onPress={() => resolveIncident(item.roomId, item.id, "Resolved by Reception")}
+                                        >
+                                            <CheckCircle size={16} color="white" />
+                                            <Text style={styles.resolveBtnText}>Resolve</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                                {item.photos && item.photos.length > 0 && (
+                                    <View style={styles.photoContainer}>
+                                        <Text style={styles.photoLabel}>{item.photos.length} Photo(s) Attached</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    />
+                )}
+            </View>
+        );
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'COMPLETED': return '#48BB78'; // Green
@@ -306,115 +540,230 @@ export default function ReceptionScreen() {
         }
     };
 
-    const renderRooms = () => (
-        <View style={styles.content}>
-            <View style={styles.rowBetween}>
-                <Text style={styles.sectionTitle}>Room Management</Text>
-                <TouchableOpacity
-                    style={[styles.addButton, { backgroundColor: theme.colors.warning }]}
-                    onPress={() => setMoveModalVisible(true)}
-                >
-                    <Briefcase size={16} color="white" />
-                    <Text style={styles.addButtonText}>Move Guest</Text>
-                </TouchableOpacity>
-            </View>
+    const renderRooms = () => {
+        // --- Filter Logic ---
+        const filteredRooms = rooms.filter(r => {
+            const matchesSearch = r.number.includes(searchQuery);
+            let matchesStatus = true;
 
-            <FlatList
-                data={rooms}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                renderItem={({ item }) => (
-                    <View style={[styles.roomEditRow, { alignItems: 'flex-start' }]}>
-                        <View style={{ flex: 1, marginRight: 10 }}>
-                            <TouchableOpacity onPress={() => navigation.navigate('RoomDetail', { roomId: item.id })}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2D3748', marginRight: 8 }}>
-                                        {item.number}
-                                    </Text>
-                                    <View style={{ backgroundColor: getStatusColor(item.status) + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                                        <Text style={{ color: getStatusColor(item.status), fontSize: 10, fontWeight: '700' }}>
-                                            {item.status}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+            if (filterStatus === 'INSPECTION') matchesStatus = r.status === 'INSPECTION';
+            if (filterStatus === 'CLEAN') matchesStatus = r.status === 'COMPLETED';
+            if (filterStatus === 'DIRTY') matchesStatus = r.status === 'PENDING' || r.status === 'IN_PROGRESS';
+            if (filterStatus === 'VIP') matchesStatus = !!r.receptionPriority;
+            if (filterStatus === 'VACANT') matchesStatus = !r.guestDetails?.currentGuest;
 
-                            <Text style={{ fontSize: 13, color: '#718096', marginBottom: 8 }}>
-                                {item.type} • {item.cleaningType.replace('_', ' ')}
-                            </Text>
+            return matchesSearch && matchesStatus;
+        });
 
-                            {/* Guest Details */}
-                            {item.guestDetails?.currentGuest ? (
-                                <View style={{ backgroundColor: '#F7FAFC', padding: 8, borderRadius: 8, marginBottom: 8 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                        <Users size={14} color="#4A5568" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#2D3748' }}>
-                                            {item.guestDetails.currentGuest}
-                                        </Text>
-                                    </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                        <Clock size={14} color="#718096" style={{ marginRight: 6 }} />
-                                        <Text style={{ fontSize: 12, color: '#718096' }}>
-                                            {item.guestDetails.checkInDate} - {item.guestDetails.checkOutDate}
-                                        </Text>
-                                    </View>
-                                </View>
-                            ) : (
-                                <Text style={{ fontSize: 12, color: '#A0AEC0', marginBottom: 8, fontStyle: 'italic' }}>Vacant</Text>
-                            )}
+        // Sort: Inspection Top, then Priority, then Number
+        const sortedRooms = filteredRooms.sort((a, b) => {
+            if (a.status === 'INSPECTION' && b.status !== 'INSPECTION') return -1;
+            if (a.status !== 'INSPECTION' && b.status === 'INSPECTION') return 1;
+            if (a.receptionPriority && !b.receptionPriority) return -1;
+            if (!a.receptionPriority && b.receptionPriority) return 1;
+            return a.number.localeCompare(b.number);
+        });
 
-                            {/* Next Guest Info (if any) */}
-                            {item.guestDetails?.nextGuest && (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                    <Text style={{ fontSize: 12, color: '#718096' }}>🔜 </Text>
-                                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#4A5568' }}>
-                                        {item.guestDetails.nextGuest}
-                                    </Text>
-                                    {item.guestDetails.nextArrival && (
-                                        <Text style={{ fontSize: 12, color: '#718096' }}> @ {item.guestDetails.nextArrival}</Text>
-                                    )}
-                                </View>
-                            )}
+        return (
+            <View style={styles.content}>
+                <View style={styles.rowBetween}>
+                    <Text style={styles.sectionTitle}>Room Management ({sortedRooms.length})</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                            style={[styles.addButton, { backgroundColor: theme.colors.secondary }]}
+                            onPress={handleAutoAssign}
+                        >
+                            <Sparkles size={16} color="white" />
+                            <Text style={styles.addButtonText}>Auto Assign</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.addButton, { backgroundColor: theme.colors.warning }]}
+                            onPress={() => setMoveModalVisible(true)}
+                        >
+                            <Briefcase size={16} color="white" />
+                            <Text style={styles.addButtonText}>Move Guest</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* --- Bulk Action Header --- */}
+                {isSelectionMode && (
+                    <View style={styles.bulkHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <TouchableOpacity onPress={handleClearSelection}><X size={20} color="white" /></TouchableOpacity>
+                            <Text style={styles.bulkTitle}>{selectedRooms.length} Selected</Text>
                         </View>
-
-                        <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                            {/* Priority Button */}
-                            <TouchableOpacity onPress={() => setPriority(item.id, !item.receptionPriority)}>
-                                <Star
-                                    size={22}
-                                    color={item.receptionPriority ? "#D69E2E" : "#E2E8F0"}
-                                    fill={item.receptionPriority ? "#D69E2E" : "transparent"}
-                                />
+                        <View style={styles.bulkActions}>
+                            <TouchableOpacity style={styles.bulkBtn} onPress={() => openTeamModal('BULK', false)}>
+                                <Text style={styles.bulkBtnText}>Assign Group</Text>
                             </TouchableOpacity>
-
-                            {/* Group Assignment Button */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.groupActionBadge,
-                                    item.assignedGroup ? styles.groupActionActive : styles.groupActionInactive,
-                                    { minWidth: 90, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 }
-                                ]}
-                                onPress={() => openTeamModal(item.id, false)}
-                            >
-                                <Briefcase size={14} color={item.assignedGroup ? theme.colors.primary : '#A0AEC0'} style={{ marginBottom: 2 }} />
-                                <Text style={[styles.groupActionText, item.assignedGroup && { color: theme.colors.primary, fontWeight: 'bold' }]}>
-                                    {item.assignedGroup ? item.assignedGroup : 'Assign'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Maintenance Button */}
-                            <TouchableOpacity
-                                onPress={() => openMaintenance(item.id)}
-                                style={[styles.iconBtn, { backgroundColor: item.status === 'MAINTENANCE' ? '#FED7D7' : '#F7FAFC' }]}
-                            >
-                                <Wrench size={18} color={item.status === 'MAINTENANCE' ? theme.colors.error : '#A0AEC0'} />
+                            <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkPriority}>
+                                <Text style={styles.bulkBtnText}>Set VIP</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 )}
-            />
-        </View>
-    );
+
+                {/* --- Search & Filters (Hide if Selecting) --- */}
+                {!isSelectionMode && (
+                    <View style={{ marginBottom: 16 }}>
+                        {/* Search Bar */}
+                        <View style={styles.searchBar}>
+                            <Search size={20} color="#A0AEC0" />
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search Room #"
+                                placeholderTextColor="#A0AEC0"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                            />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <X size={18} color="#A0AEC0" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Filter Chips */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+                            {(['ALL', 'DIRTY', 'INSPECTION', 'CLEAN', 'VIP', 'VACANT'] as const).map(filter => (
+                                <TouchableOpacity
+                                    key={filter}
+                                    style={[
+                                        styles.filterChip,
+                                        filterStatus === filter && styles.filterChipActive,
+                                        filter === 'INSPECTION' && filterStatus === filter && { backgroundColor: '#F6E05E', borderColor: '#F6E05E' },
+                                        filter === 'DIRTY' && filterStatus === filter && { backgroundColor: '#FC8181', borderColor: '#FC8181' },
+                                        filter === 'CLEAN' && filterStatus === filter && { backgroundColor: '#68D391', borderColor: '#68D391' }
+                                    ]}
+                                    onPress={() => setFilterStatus(filter)}
+                                >
+                                    <Text style={[
+                                        styles.filterChipText,
+                                        filterStatus === filter && styles.filterChipTextActive,
+                                        (filter === 'INSPECTION' || filter === 'DIRTY' || filter === 'CLEAN') && filterStatus === filter && { color: 'white' }
+                                    ]}>
+                                        {filter}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                <FlatList
+                    data={sortedRooms}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={{ paddingBottom: 60 }}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            onLongPress={() => toggleSelection(item.id)}
+                            onPress={() => {
+                                if (isSelectionMode) toggleSelection(item.id);
+                                else navigation.navigate('RoomDetail', { roomId: item.id });
+                            }}
+                            activeOpacity={0.9}
+                        >
+                            <View style={[styles.roomEditRow, { alignItems: 'flex-start' }, selectedRooms.includes(item.id) && styles.roomRowSelected]}>
+                                <View style={{ flex: 1, marginRight: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                        {isSelectionMode && (
+                                            <View style={{ width: 30, justifyContent: 'center' }}>
+                                                {selectedRooms.includes(item.id) ? (
+                                                    <CheckCircle size={20} color={theme.colors.primary} fill={theme.colors.primary} />
+                                                ) : (
+                                                    <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#CBD5E0' }} />
+                                                )}
+                                            </View>
+                                        )}
+                                        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2D3748', marginRight: 8 }}>
+                                            {item.number}
+                                        </Text>
+                                        <View style={{ backgroundColor: getStatusColor(item.status) + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                            <Text style={{ color: getStatusColor(item.status), fontSize: 10, fontWeight: '700' }}>
+                                                {item.status}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={{ fontSize: 13, color: '#718096', marginBottom: 8 }}>
+                                        {item.type} • {item.cleaningType.replace('_', ' ')}
+                                    </Text>
+
+                                    {/* Guest Details */}
+                                    {item.guestDetails?.currentGuest ? (
+                                        <View style={{ backgroundColor: '#F7FAFC', padding: 8, borderRadius: 8, marginBottom: 8 }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                                <Users size={14} color="#4A5568" style={{ marginRight: 6 }} />
+                                                <Text style={{ fontSize: 13, fontWeight: '600', color: '#2D3748' }}>
+                                                    {item.guestDetails.currentGuest}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Clock size={14} color="#718096" style={{ marginRight: 6 }} />
+                                                <Text style={{ fontSize: 12, color: '#718096' }}>
+                                                    {item.guestDetails.checkInDate} - {item.guestDetails.checkOutDate}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <Text style={{ fontSize: 12, color: '#A0AEC0', marginBottom: 8, fontStyle: 'italic' }}>Vacant</Text>
+                                    )}
+
+                                    {/* Next Guest Info (if any) */}
+                                    {item.guestDetails?.nextGuest && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                            <Text style={{ fontSize: 12, color: '#718096' }}>🔜 </Text>
+                                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#4A5568' }}>
+                                                {item.guestDetails.nextGuest}
+                                            </Text>
+                                            {item.guestDetails.nextArrival && (
+                                                <Text style={{ fontSize: 12, color: '#718096' }}> @ {item.guestDetails.nextArrival}</Text>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={{ alignItems: 'flex-end', gap: 8 }}>
+                                    {/* Priority Button */}
+                                    <TouchableOpacity onPress={() => setPriority(item.id, !item.receptionPriority)}>
+                                        <Star
+                                            size={22}
+                                            color={item.receptionPriority ? "#D69E2E" : "#E2E8F0"}
+                                            fill={item.receptionPriority ? "#D69E2E" : "transparent"}
+                                        />
+                                    </TouchableOpacity>
+
+                                    {/* Group Assignment Button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.groupActionBadge,
+                                            item.assignedGroup ? styles.groupActionActive : styles.groupActionInactive,
+                                            { minWidth: 90, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 }
+                                        ]}
+                                        onPress={() => openTeamModal(item.id, false)}
+                                    >
+                                        <Briefcase size={14} color={item.assignedGroup ? theme.colors.primary : '#A0AEC0'} style={{ marginBottom: 2 }} />
+                                        <Text style={[styles.groupActionText, item.assignedGroup && { color: theme.colors.primary, fontWeight: 'bold' }]}>
+                                            {item.assignedGroup ? item.assignedGroup : 'Assign'}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* Maintenance Button */}
+                                    <TouchableOpacity
+                                        onPress={() => openMaintenance(item.id)}
+                                        style={[styles.iconBtn, { backgroundColor: item.status === 'MAINTENANCE' ? '#FED7D7' : '#F7FAFC' }]}
+                                    >
+                                        <Wrench size={18} color={item.status === 'MAINTENANCE' ? theme.colors.error : '#A0AEC0'} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
+            </View>
+        );
+    };
 
     const CLEANING_OPTIONS: CleaningType[] = ['DEPARTURE', 'STAYOVER', 'PREARRIVAL', 'HOLDOVER', 'WEEKLY', 'RUBBISH', 'DAYUSE'];
 
@@ -475,9 +824,17 @@ export default function ReceptionScreen() {
                     <Briefcase size={18} color={activeTab === 'REQUESTS' ? theme.colors.primary : '#A0AEC0'} />
                     <Text style={[styles.navTabText, activeTab === 'REQUESTS' && styles.navTextActive]}>Requests</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.navTab, activeTab === 'TEAMS' && styles.navTabActive]}
+                    onPress={() => setActiveTab('TEAMS')}
+                >
+                    <Users size={18} color={activeTab === 'TEAMS' ? theme.colors.primary : '#A0AEC0'} />
+                    <Text style={[styles.navTabText, activeTab === 'TEAMS' && styles.navTextActive]}>Teams</Text>
+                </TouchableOpacity>
             </View>
 
             {activeTab === 'DASHBOARD' && renderDashboard()}
+            {activeTab === 'TEAMS' && renderTeams()}
             {activeTab === 'STAFF' && renderStaff()}
             {activeTab === 'ROOMS' && renderRooms()}
             {activeTab === 'REQUESTS' && (
@@ -798,6 +1155,52 @@ const styles = StyleSheet.create({
     vipBadge: { backgroundColor: '#D69E2E', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
     vipText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
 
+    // Team Card Styles
+    teamCard: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: theme.colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2
+    },
+    teamHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    teamTitle: { fontSize: 18, fontWeight: 'bold', color: '#2D3748' },
+    teamSubtitle: { fontSize: 13, color: '#718096', marginTop: 2, maxWidth: 200 },
+    teamStats: { alignItems: 'flex-end' },
+    teamProgressText: { fontSize: 14, fontWeight: '700', color: theme.colors.primary, marginBottom: 4 },
+    progressBar: { width: 80, height: 6, backgroundColor: '#EDF2F7', borderRadius: 3, overflow: 'hidden' },
+    progressFill: { height: '100%', backgroundColor: theme.colors.primary },
+
+    inspectionAlert: {
+        backgroundColor: '#FFFFF0',
+        borderColor: '#FBD38D',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16
+    },
+    inspectionText: { color: '#B7791F', fontWeight: '600', fontSize: 13 },
+
+    miniGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    miniRoomBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        minWidth: 40,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    miniRoomText: { fontSize: 12, fontWeight: 'bold' },
+    dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ECC94B', position: 'absolute', top: 4, right: 4 },
+
     // Staff Styles
     staffCard: {
         flexDirection: 'row',
@@ -928,5 +1331,93 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         color: theme.colors.success
-    }
+    },
+
+    // Search & Filter Styles (Fixed)
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        height: 48,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 8
+    },
+    searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: '#2D3748' },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginRight: 8,
+        marginBottom: 4
+    },
+    filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+    filterChipText: { fontSize: 14, color: '#718096', fontWeight: '600' },
+    filterChipTextActive: { color: 'white' },
+
+    // Bulk Action Styles
+    bulkHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: theme.colors.primary,
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 16
+    },
+    bulkTitle: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+    bulkActions: { flexDirection: 'row', gap: 12 },
+    bulkBtn: { backgroundColor: 'white', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    bulkBtnText: { color: theme.colors.primary, fontWeight: 'bold', fontSize: 12 },
+
+    // Selection Styles
+    roomRowSelected: {
+        backgroundColor: '#EBF8FF',
+        borderColor: theme.colors.primary,
+        borderWidth: 1
+    },
+
+    // Maintenance Styles (Phase 3)
+    incidentCard: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: theme.colors.error,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2
+    },
+    incidentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    incidentInfo: { flex: 1, marginRight: 12 },
+    incidentRoom: { fontSize: 16, fontWeight: 'bold', color: '#2D3748', marginRight: 8 },
+    incidentDesc: { fontSize: 14, color: '#4A5568', marginBottom: 4, lineHeight: 20 },
+    incidentTime: { fontSize: 12, color: '#A0AEC0' },
+    incidentActions: { alignItems: 'flex-end' },
+    resolveBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.success,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 6
+    },
+    resolveBtnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
+    priorityBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.error, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 2 },
+    priorityText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+    photoContainer: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#EDF2F7' },
+    photoLabel: { fontSize: 12, color: theme.colors.primary, fontWeight: '600' },
+
+    // Empty State (Added)
+    emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
+    emptyStateText: { fontSize: 18, fontWeight: 'bold', color: '#2D3748', marginTop: 16 },
+    emptyStateSubtext: { fontSize: 14, color: '#718096', marginTop: 8 }
 });

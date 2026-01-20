@@ -55,9 +55,7 @@ class Room(models.Model):
 
     guest_status = models.CharField(max_length=20, choices=GUEST_STATUS_CHOICES, default='NO_GUEST')
     
-    GROUP_CHOICES = tuple([(f'Group {i}', f'Group {i}') for i in range(1, 11)]) # Group 1 - Group 10
-
-    assigned_group = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. 'Group 1'", choices=GROUP_CHOICES)
+    assigned_group = models.CharField(max_length=50, blank=True, null=True, help_text="e.g. 'Group 1' or 'Lobby Team'")
     assigned_cleaner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_rooms')
     priority = models.BooleanField(default=False)
     

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, TouchableWithoutFeedback, Keyboard, Animated, Vibration } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,11 +8,30 @@ import { KeyRound, Lock, User } from 'lucide-react-native';
 const LoginScreen = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const { login, isLoading } = useAuth();
 
+    // Shake Animation Ref
+    const shakeAnimation = React.useRef(new Animated.Value(0)).current;
+
+    const startShake = () => {
+        Animated.sequence([
+            Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+            Animated.timing(shakeAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
+            Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
+            Animated.timing(shakeAnimation, { toValue: 0, duration: 100, useNativeDriver: true })
+        ]).start();
+    };
+
     const handleLogin = async () => {
+        setError(null);
         if (username.trim() && password.trim()) {
-            await login(username, password);
+            const success = await login(username, password);
+            if (!success) {
+                setError('Invalid username or password');
+                startShake();
+                Vibration.vibrate();
+            }
         }
     };
 
@@ -32,8 +51,16 @@ const LoginScreen = () => {
                             <Text style={styles.subtitle}>Premium Housekeeping Management</Text>
                         </View>
 
-                        <View style={styles.formContainer}>
+
+
+                        <Animated.View style={[styles.formContainer, { transform: [{ translateX: shakeAnimation }] }]}>
                             <Text style={styles.label}>Sign in to your account</Text>
+
+                            {error && (
+                                <View style={styles.errorContainer}>
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
 
                             <View style={styles.inputWrapper}>
                                 <User color={theme.colors.textSecondary} size={20} style={styles.inputIcon} />
@@ -76,7 +103,8 @@ const LoginScreen = () => {
                             <View style={styles.hintContainer}>
                                 <Text style={styles.hintText}>Enter credentials from Django Admin</Text>
                             </View>
-                        </View>
+
+                        </Animated.View>
                     </ScrollView>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
@@ -130,9 +158,23 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 16,
-        fontWeight: '600',
         color: theme.colors.text,
-        marginBottom: theme.spacing.m,
+        marginBottom: theme.spacing.l,
+        fontWeight: '600',
+    },
+    errorContainer: {
+        backgroundColor: '#FFE5E5',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#FF4D4D',
+        alignItems: 'center'
+    },
+    errorText: {
+        color: '#D8000C',
+        fontSize: 14,
+        fontWeight: '600'
     },
     inputWrapper: {
         flexDirection: 'row',

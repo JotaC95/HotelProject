@@ -6,7 +6,7 @@ import { theme } from '../utils/theme';
 import { CheckCircle, AlertTriangle, Wrench, XCircle, Clock, AlertCircle, Plus, Box, Package } from 'lucide-react-native'; // Added Box, Package
 
 export default function MaintenanceScreen() {
-    const { rooms, resolveIncident, updateRoomStatus, startMaintenance, addIncident, assets, addAsset, updateAssetStatus, fetchAssets } = useHotel(); // Added assets
+    const { rooms, resolveIncident, updateRoomStatus, startMaintenance, addIncident, assets, addAsset, updateAssetStatus, fetchAssets, systemIncidents, fetchSystemIncidents } = useHotel(); // Added assets
     const { logout, user } = useAuth();
     const [activeTab, setActiveTab] = useState<'TASKS' | 'BLOCKED' | 'PREVENTIVE' | 'ASSETS'>('TASKS');
     const [maintenanceModalVisible, setMaintenanceModalVisible] = useState(false);
@@ -23,14 +23,29 @@ export default function MaintenanceScreen() {
     const [newAssetName, setNewAssetName] = useState('');
     const [newAssetSerial, setNewAssetSerial] = useState('');
 
+    React.useEffect(() => {
+        fetchSystemIncidents();
+    }, []);
+
     // --- Work Orders (Open Incidents) ---
-    const allWorkOrders = rooms.reduce<{ incident: Incident, roomNumber: string, roomId: string }[]>((acc, room) => {
-        const roomIncidents = room.incidents
-            // Filter: Only Maintenance role, Status OPEN
+    const allWorkOrders = React.useMemo(() => {
+        const roomIncidents = rooms.reduce<{ incident: Incident, roomNumber: string, roomId: string | null }[]>((acc, room) => {
+            const incs = room.incidents
+                .filter(inc => inc.targetRole === 'MAINTENANCE' && inc.status === 'OPEN')
+                .map(inc => ({ incident: inc, roomNumber: room.number, roomId: room.id }));
+            return [...acc, ...incs];
+        }, []);
+
+        const sysIncidents = systemIncidents
             .filter(inc => inc.targetRole === 'MAINTENANCE' && inc.status === 'OPEN')
-            .map(inc => ({ incident: inc, roomNumber: room.number, roomId: room.id }));
-        return [...acc, ...roomIncidents];
-    }, []).sort((a, b) => new Date(b.incident.timestamp).getTime() - new Date(a.incident.timestamp).getTime());
+            .map(inc => ({ incident: inc, roomNumber: 'General', roomId: null }));
+
+        const all = [...roomIncidents, ...sysIncidents];
+
+        // Filter by Assigned To
+        return all.filter(item => !item.incident.assignedTo || item.incident.assignedTo === user?.id)
+            .sort((a, b) => new Date(b.incident.timestamp).getTime() - new Date(a.incident.timestamp).getTime());
+    }, [rooms, systemIncidents, user]);
 
     const reactiveOrders = allWorkOrders.filter(w => w.incident.category !== 'PREVENTIVE');
     const preventiveOrders = allWorkOrders.filter(w => w.incident.category === 'PREVENTIVE');
@@ -38,13 +53,13 @@ export default function MaintenanceScreen() {
     // --- Blocked Rooms (Maintenance Status) ---
     const blockedRooms = rooms.filter(r => r.status === 'MAINTENANCE');
 
-    const handleResolve = (roomId: string, incidentId: string) => {
+    const handleResolve = (roomId: string | null, incidentId: string) => {
         Alert.alert(
             "Complete Work Order",
             "Mark this task as completed?",
             [
                 { text: "Cancel", style: "cancel" },
-                { text: "Complete", onPress: () => resolveIncident(roomId, incidentId) }
+                { text: "Complete", onPress: () => resolveIncident(roomId || '', incidentId) }
             ]
         );
     };
@@ -109,7 +124,7 @@ export default function MaintenanceScreen() {
         }
     };
 
-    const renderWorkOrder = ({ item }: { item: { incident: Incident, roomNumber: string, roomId: string } }) => (
+    const renderWorkOrder = ({ item }: { item: { incident: Incident, roomNumber: string, roomId: string | null } }) => (
         <View style={styles.card}>
             <View style={styles.cardHeader}>
                 <View style={[styles.roomBadge, item.incident.category === 'PREVENTIVE' ? { backgroundColor: theme.colors.success } : {}]}>

@@ -5,7 +5,7 @@ import { useAuth, UserRole } from '../contexts/AuthContext';
 import { RoomCard } from '../components/RoomCard';
 import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
 import { theme } from '../utils/theme';
-import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff } from 'lucide-react-native'; // Clean icon for help
+import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react-native'; // Clean icon for help
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { SkeletonRoomCard } from '../components/SkeletonRoomCard';
@@ -63,7 +63,7 @@ const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
 
 const DashboardHeader = () => {
     const { user, logout } = useAuth();
-    const { rooms, session, staff } = useHotel();
+    const { rooms, session, staff, systemIncidents } = useHotel();
     const [cleanerShowAll, setCleanerShowAll] = useState(false); // Local State for cleaner view if needed, or pass props
 
     // Lift state up or access context if RoomListScreen holds it?
@@ -85,13 +85,20 @@ const DashboardHeader = () => {
                     if (r.assigned_cleaner) return false;
                     return r.assignedGroup === user.groupId;
                 });
+                const completedRooms = myRooms.filter(r => r.status === 'COMPLETED').length;
+                const totalRooms = myRooms.length;
 
-                const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
-                const total = myRooms.length;
+                // Tasks Stats
+                const myTasks = systemIncidents.filter(i =>
+                    i.targetRole === 'CLEANER' &&
+                    i.status === 'OPEN' &&
+                    (!i.assignedTo || i.assignedTo === user.id)
+                ).length;
+
                 return [
-                    { label: 'My List', value: total, icon: '🛏️' },
-                    { label: 'Done', value: completed, icon: '✅' },
-                    { label: 'Progress', value: `${total ? Math.round((completed / total) * 100) : 0}%`, icon: '📊' }
+                    { label: 'My Rooms', value: totalRooms, icon: '🛏️' },
+                    { label: 'My Tasks', value: myTasks, icon: '📋' },
+                    { label: 'Progress', value: `${totalRooms ? Math.round((completedRooms / totalRooms) * 100) : 0}%`, icon: '📊' }
                 ];
             }
             case 'SUPERVISOR': {
@@ -210,9 +217,23 @@ const CleanerActionPanel = ({ showAll, setShowAll }: { showAll: boolean, setShow
 };
 
 export default function RoomListScreen() {
-    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, isOffline } = useHotel();
+    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, resolveIncident, isOffline, fetchSystemIncidents } = useHotel();
     const { user, logout } = useAuth();
     const navigation = useNavigation<NavigationProp>();
+
+    useEffect(() => {
+        fetchSystemIncidents();
+    }, []);
+
+    // My Assigned Tasks
+    const myTasks = useMemo(() => {
+        if (!systemIncidents) return [];
+        return systemIncidents.filter(i =>
+            i.targetRole === 'CLEANER' &&
+            i.status === 'OPEN' &&
+            (!i.assignedTo || i.assignedTo === user?.id)
+        );
+    }, [systemIncidents, user]);
 
     // Confetti Ref
     const confettiRef = useRef<ConfettiCannon>(null);
@@ -651,6 +672,47 @@ export default function RoomListScreen() {
                 <View style={styles.offlineBanner}>
                     <WifiOff size={20} color="white" />
                     <Text style={styles.offlineText}>You are offline. Changes saved locally.</Text>
+                </View>
+            )}
+
+            {/* Assigned Tasks Section */}
+            {myTasks.length > 0 && (
+                <View style={{ marginBottom: 16, paddingHorizontal: 16 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8, color: theme.colors.text }}>My Tasks</Text>
+                    {myTasks.map(task => (
+                        <View key={task.id} style={{
+                            backgroundColor: 'white',
+                            padding: 12,
+                            borderRadius: 12,
+                            marginBottom: 8,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            ...theme.shadows.card
+                        }}>
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <Text style={{ fontWeight: 'bold', fontSize: 16 }}>{task.text}</Text>
+                                    {task.priority === 'EMERGENCY' && <AlertTriangle size={14} color={theme.colors.error} />}
+                                </View>
+                                {task.assignedTo === user?.id && (
+                                    <View style={{ backgroundColor: '#EBF8FF', alignSelf: 'flex-start', paddingHorizontal: 6, borderRadius: 4, marginBottom: 4 }}>
+                                        <Text style={{ color: '#3182CE', fontSize: 10, fontWeight: 'bold' }}>ASSIGNED TO ME</Text>
+                                    </View>
+                                )}
+                                <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                                    {new Date(task.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                style={{ backgroundColor: theme.colors.success, padding: 8, borderRadius: 8 }}
+                                onPress={() => resolveIncident(null, task.id)}
+                            >
+                                <CheckCircle color="white" size={20} />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
                 </View>
             )}
 

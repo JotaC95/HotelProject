@@ -204,7 +204,7 @@ interface HotelContextType {
     updateNotes: (id: string, notes: string) => void;
     updateGuestStatus: (id: string, status: GuestStatus, keysFound?: boolean) => void;
     startMaintenance: (id: string, reason: string) => void; // Phase 20
-    resolveIncident: (roomId: string, incidentId: string) => void;
+    resolveIncident: (roomId: string | null, incidentId: string) => void;
     updateRoomDetails: (id: string, updates: Partial<Room>) => Promise<void>;
     toggleGuestInRoom: (id: string, inRoom: boolean) => Promise<void>;
     toggleGuestWaiting: (id: string, waiting: boolean) => Promise<void>; // New
@@ -667,17 +667,24 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const resolveIncident = async (roomId: string, incidentId: string) => {
+    const resolveIncident = async (roomId: string | null, incidentId: string) => {
         // Optimistic
-        setRooms(prev => prev.map(room => {
-            if (room.id === roomId) {
-                const updatedIncidents = room.incidents.map(inc =>
-                    inc.id === incidentId ? { ...inc, status: 'RESOLVED' as IncidentStatus } : inc
-                );
-                return { ...room, incidents: updatedIncidents };
-            }
-            return room;
-        }));
+        if (roomId) {
+            setRooms(prev => prev.map(room => {
+                if (room.id === roomId) {
+                    const updatedIncidents = room.incidents.map(inc =>
+                        inc.id === incidentId ? { ...inc, status: 'RESOLVED' as IncidentStatus } : inc
+                    );
+                    return { ...room, incidents: updatedIncidents };
+                }
+                return room;
+            }));
+        } else {
+            // System Incident Optimistic Update
+            setSystemIncidents(prev => prev.map(inc =>
+                inc.id === incidentId ? { ...inc, status: 'RESOLVED' as IncidentStatus } : inc
+            ));
+        }
 
         try {
             await api.patch(`/housekeeping/incidents/${incidentId}/`, { status: 'RESOLVED' });

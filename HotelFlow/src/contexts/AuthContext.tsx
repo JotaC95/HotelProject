@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return true;
         } catch (error) {
             console.error(error);
-            Alert.alert("Login Failed", "Invalid username or password.");
+            // Alert.alert("Login Failed", "Invalid username or password.");
             return false;
         } finally {
             setIsLoading(false);

@@ -39,8 +39,12 @@ export default function HousemanScreen() {
         const roomIncidents = rooms.flatMap(r => r.incidents.map(i => ({ ...i, roomNumber: r.number, roomId: r.id })));
         const all = [...roomIncidents, ...systemIncidents.map(i => ({ ...i, roomNumber: 'System', roomId: null }))];
 
-        return all.filter(i => i.targetRole === 'HOUSEMAN' && i.status === 'OPEN');
-    }, [rooms, systemIncidents]);
+        return all.filter(i =>
+            i.targetRole === 'HOUSEMAN' &&
+            i.status === 'OPEN' &&
+            (!i.assignedTo || i.assignedTo === user?.id)
+        );
+    }, [rooms, systemIncidents, user]);
 
     const prepRooms = useMemo(() => {
         // Filter: Prearrival/Departure, Pending only (Houseman goes first)

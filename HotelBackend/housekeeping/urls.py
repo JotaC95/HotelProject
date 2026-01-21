@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RoomViewSet, IncidentViewSet, InventoryItemViewSet, CleaningTypeDefinitionViewSet, CleaningSessionViewSet, LostItemViewSet, AnnouncementViewSet, StatsViewSet, AssetViewSet
+from .views import RoomViewSet, IncidentViewSet, InventoryItemViewSet, CleaningTypeDefinitionViewSet, CleaningSessionViewSet, LostItemViewSet, AnnouncementViewSet, StatsViewSet, AssetViewSet, ImportRoomsView
 from .roster_views import AvailabilityViewSet, RosterViewSet, AutoAssignRoomsViewSet
 
 router = DefaultRouter()
@@ -19,4 +19,5 @@ router.register(r'assign-rooms', AutoAssignRoomsViewSet, basename='assign-rooms'
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('import_json/', ImportRoomsView.as_view(), name='import_json'),
 ]

@@ -1,18 +1,63 @@
-from rest_framework import viewsets, permissions
-from .models import Room, Incident, InventoryItem, CleaningTypeDefinition, LostItem, Announcement, Asset
-from .serializers import RoomSerializer, IncidentSerializer, InventoryItemSerializer, CleaningTypeDefinitionSerializer, LostItemSerializer, AnnouncementSerializer, AssetSerializer
+from rest_framework import viewsets, permissions, status, views
+from .models import Room, Incident, InventoryItem, CleaningTypeDefinition, LostItem, Announcement, Asset, CleaningSession
+from .serializers import (
+    RoomSerializer, IncidentSerializer, InventoryItemSerializer, 
+    CleaningTypeDefinitionSerializer, LostItemSerializer, 
+    AnnouncementSerializer, AssetSerializer, CleaningSessionSerializer
+)
 from accounts.models import CustomUser
 from .utils import send_multicast_push
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .utils import send_multicast_push
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .models import CleaningSession
-from .serializers import CleaningSessionSerializer
-from .models import CleaningSession
-from .serializers import CleaningSessionSerializer
 from django.utils import timezone
+import json
+
+class ImportRoomsView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        if not data or 'teams' not in data:
+            return Response({'error': 'Invalid JSON format. "teams" key required.'}, status=400)
+
+        teams = data.get('teams', {})
+        results = []
+
+        for team_key, team_data in teams.items():
+            # team_1 -> Group 1
+            if "team_" in team_key:
+                group_name = team_key.replace("team_", "Group ")
+            else:
+                group_name = team_key.replace('_', ' ').title()
+
+            for room_data in team_data.get('rooms', []):
+                room_number = room_data.get('room')
+                task_raw = room_data.get('task', 'Departure')
+                cleaning_type = 'DEPARTURE'
+                
+                if 'Pre Arrival' in task_raw: cleaning_type = 'PREARRIVAL'
+                elif 'Rubbish' in task_raw: cleaning_type = 'RUBBISH'
+                elif 'Stayover' in task_raw: cleaning_type = 'STAYOVER'
+                elif 'Weekly' in task_raw: cleaning_type = 'WEEKLY'
+                
+                # Create/Update
+                room, created = Room.objects.get_or_create(number=room_number)
+                room.assigned_group = group_name
+                room.cleaning_type = cleaning_type
+                room.notes = room_data.get('notes', '')
+                
+                in_out = room_data.get('in_out')
+                if in_out == 'In': room.guest_status = 'GUEST_IN_ROOM'
+                elif in_out == 'Out': room.guest_status = 'GUEST_OUT'
+                
+                # Reset for day
+                room.status = 'PENDING'
+                room.save()
+                
+                results.append(f"{'Created' if created else 'Updated'} Room {room_number} -> {group_name}")
+
+        return Response({'message': 'Import Successful', 'details': results})
+
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all().order_by('name')
     serializer_class = InventoryItemSerializer
@@ -31,8 +76,6 @@ class RoomViewSet(viewsets.ModelViewSet):
              pass 
              
         return queryset 
-
- 
 
     def perform_update(self, serializer):
         # Capture previous status

@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import Room, Incident, InventoryItem, CleaningTypeDefinition, LostItem, Announcement, Asset
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,10 +19,11 @@ class IncidentSerializer(serializers.ModelSerializer):
     timestamp = serializers.DateTimeField(source='created_at', read_only=True) # Map created_at to 'timestamp'
     targetRole = serializers.CharField(source='target_role') # Map snake to camel
     photoUri = serializers.CharField(source='photo_uri', required=False, allow_null=True)
+    assignedTo = serializers.PrimaryKeyRelatedField(source='assigned_to', queryset=User.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Incident
-        fields = ['id', 'text', 'timestamp', 'user', 'photoUri', 'targetRole', 'status', 'room', 'category']
+        fields = ['id', 'text', 'timestamp', 'user', 'photoUri', 'targetRole', 'status', 'room', 'category', 'priority', 'assignedTo']
 
 class RoomSerializer(serializers.ModelSerializer):
     incidents = IncidentSerializer(many=True, read_only=True)

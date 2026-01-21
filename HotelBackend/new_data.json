@@ -1,0 +1,329 @@
+{
+    "date": "2026-01-22",
+    "property": "Quest Williamstown North",
+    "teams": {
+        "team_1": {
+            "total_rooms": 16,
+            "rooms": [
+                {
+                    "room": "01",
+                    "res_no": "6077785",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock 2nd bedroom, 1 king"
+                },
+                {
+                    "room": "01",
+                    "res_no": "6121823",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Lock second bedroom, 1 king"
+                },
+                {
+                    "room": "02",
+                    "res_no": "6089726",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom, 1 king"
+                },
+                {
+                    "room": "02",
+                    "res_no": "5966097",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Unlock second bedroom, 2 kings"
+                },
+                {
+                    "room": "06",
+                    "res_no": "5943022",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Unlock second bedroom"
+                },
+                {
+                    "room": "06",
+                    "res_no": "6015739",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Unlock both bedrooms, ETA 16:00"
+                },
+                {
+                    "room": "09",
+                    "res_no": "6066661",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second & third bedroom"
+                },
+                {
+                    "room": "11",
+                    "res_no": "6089724",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "11",
+                    "res_no": "5967945",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Unlock second bedroom"
+                },
+                {
+                    "room": "15",
+                    "res_no": "5986574",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom, 1 queen"
+                },
+                {
+                    "room": "15",
+                    "res_no": "5714675",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "1 queen"
+                },
+                {
+                    "room": "16",
+                    "res_no": "6089727",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "16",
+                    "res_no": "6024880",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "1 king + 2 singles, ETA 16:00"
+                },
+                {
+                    "room": "17",
+                    "res_no": "6089725",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "17",
+                    "res_no": "5936164",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Lock second room, ETA will pick"
+                },
+                {
+                    "room": "20",
+                    "res_no": "6084221",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                }
+            ]
+        },
+        "team_2": {
+            "total_rooms": 13,
+            "rooms": [
+                {
+                    "room": "22",
+                    "res_no": "5943023",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Unlock second bedroom"
+                },
+                {
+                    "room": "22",
+                    "res_no": "6112740",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "2 kings, ETA late"
+                },
+                {
+                    "room": "24",
+                    "res_no": "6085243",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Open second bedroom"
+                },
+                {
+                    "room": "27",
+                    "res_no": "6072216",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "28",
+                    "res_no": "6072253",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "29",
+                    "res_no": "6084708",
+                    "in_out": null,
+                    "task": "Departure",
+                    "notes": "2A 1C, unlock second bedroom"
+                },
+                {
+                    "room": "30",
+                    "res_no": "5989730",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Accessible room"
+                },
+                {
+                    "room": "32",
+                    "res_no": "6089682",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Conference room"
+                },
+                {
+                    "room": "33",
+                    "res_no": "6021005",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second room"
+                },
+                {
+                    "room": "34",
+                    "res_no": "6087728",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "34",
+                    "res_no": "6095212",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "ETA 6pm"
+                },
+                {
+                    "room": "35",
+                    "res_no": "6084222",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "35",
+                    "res_no": "6046890",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "ETA 16:30"
+                }
+            ]
+        },
+        "team_3": {
+            "total_rooms": 15,
+            "rooms": [
+                {
+                    "room": "38",
+                    "res_no": "6093421",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Maintenance in"
+                },
+                {
+                    "room": "47",
+                    "res_no": "6058631",
+                    "in_out": null,
+                    "task": "Rubbish Removal",
+                    "notes": "Unlock 2nd & 3rd room, 2 kings"
+                },
+                {
+                    "room": "49",
+                    "res_no": "6085868",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 king"
+                },
+                {
+                    "room": "49",
+                    "res_no": "5885412",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "2 kings"
+                },
+                {
+                    "room": "49",
+                    "res_no": "6093221",
+                    "in_out": null,
+                    "task": "Departure",
+                    "notes": "No-show room clean"
+                },
+                {
+                    "room": "50",
+                    "res_no": "6062279",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 king + 2 singles"
+                },
+                {
+                    "room": "51",
+                    "res_no": "6085869",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 king"
+                },
+                {
+                    "room": "51",
+                    "res_no": "6033946",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "1 king"
+                },
+                {
+                    "room": "55",
+                    "res_no": "5986998",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 king"
+                },
+                {
+                    "room": "57",
+                    "res_no": "6088264",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room": "57",
+                    "res_no": "6084480",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Early arrival 11am (not guaranteed), ETA 12pm"
+                },
+                {
+                    "room": "58",
+                    "res_no": "6047238",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 king"
+                },
+                {
+                    "room": "58",
+                    "res_no": "5624811",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "VIP"
+                },
+                {
+                    "room": "60",
+                    "res_no": "6104987",
+                    "in_out": "Out",
+                    "task": "Departure",
+                    "notes": "1 queen"
+                },
+                {
+                    "room": "60",
+                    "res_no": "6061122",
+                    "in_out": "In",
+                    "task": "Pre Arrival Check",
+                    "notes": "Make 2nd bedroom a king"
+                }
+            ]
+        }
+    }
+}

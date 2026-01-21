@@ -62,24 +62,28 @@ const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
 };
 
 const DashboardHeader = () => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const { rooms, session, staff } = useHotel();
+    const [cleanerShowAll, setCleanerShowAll] = useState(false); // Local State for cleaner view if needed, or pass props
+
+    // Lift state up or access context if RoomListScreen holds it?
+    // Actually, RoomListScreen holds `cleanerShowAll`.
+    // Let's keep DashboardHeader for Stats and make a new "ToolsHeader" or modify this one.
+    // For simplicity, I'll return the DashboardHeader with the Logout button added, 
+    // and I'll Create a separate "CleanerActionPanel" component.
 
     const stats = useMemo(() => {
         if (!user) return null;
 
         switch (user.role) {
             case 'CLEANER': {
-                // Count explicitly assigned rooms first
                 const assignedToMe = rooms.filter(r => r.assigned_cleaner === user.id);
-                // Fallback to group if no assignments? Or just sum? 
-                // Let's use the same logic as the list filter for consistency
                 const myRooms = rooms.filter(r => {
                     const assignedId = String(r.assigned_cleaner);
                     const userId = String(user.id);
                     if (assignedId === userId) return true;
-                    if (r.assigned_cleaner) return false; // Assigned to others (if exists and not me)
-                    return r.assignedGroup === user.groupId; // Fallback
+                    if (r.assigned_cleaner) return false;
+                    return r.assignedGroup === user.groupId;
                 });
 
                 const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
@@ -92,7 +96,7 @@ const DashboardHeader = () => {
             }
             case 'SUPERVISOR': {
                 const toInspect = rooms.filter(r => r.status === 'INSPECTION').length;
-                const activeStaff = staff?.length || 0; // Mock if staff list not populated
+                const activeStaff = staff?.length || 0;
                 return [
                     { label: 'To Inspect', value: toInspect, icon: '🔍', alert: toInspect > 0 },
                     { label: 'Team Active', value: activeStaff, icon: '👥' },
@@ -109,9 +113,8 @@ const DashboardHeader = () => {
                 ];
             }
             case 'RECEPTION': {
-                // Reception cares about Room Status for Check-in
                 const ready = rooms.filter(r => r.status === 'COMPLETED').length;
-                const dirty = rooms.filter(r => r.status === 'PENDING').length; // Or 'DIRTY' if mapped
+                const dirty = rooms.filter(r => r.status === 'PENDING').length;
                 return [
                     { label: 'Ready', value: ready, icon: '✨' },
                     { label: 'Dirty', value: dirty, icon: '🧹' },
@@ -138,8 +141,13 @@ const DashboardHeader = () => {
                     <Text style={styles.greetingText}>{greeting},</Text>
                     <Text style={styles.userNameText}>{user?.name || user?.username}</Text>
                 </View>
-                <View style={styles.roleBadge}>
-                    <Text style={styles.roleText}>{user?.role}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={styles.roleBadge}>
+                        <Text style={styles.roleText}>{user?.role}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => logout()} style={styles.logoutBtnHeader}>
+                        <LogOut size={16} color="white" />
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -151,6 +159,51 @@ const DashboardHeader = () => {
                         <Text style={[styles.statLabel, stat.alert && styles.statLabelAlert]}>{stat.label}</Text>
                     </View>
                 ))}
+            </View>
+        </View>
+    );
+};
+
+const CleanerActionPanel = ({ showAll, setShowAll }: { showAll: boolean, setShowAll: (v: boolean) => void }) => {
+    const { rooms } = useHotel();
+    const { user } = useAuth();
+    const isCleaner = user?.role === 'CLEANER';
+
+    if (!isCleaner) return null;
+
+    // Calculate specific user progress
+    const myRooms = rooms.filter(r => r.assigned_cleaner === user.id || (user.groupId && r.assignedGroup === user.groupId && !r.assigned_cleaner));
+    const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
+    const total = myRooms.length;
+    const progress = total > 0 ? completed / total : 0;
+
+    return (
+        <View style={styles.cleanerPanel}>
+            <View style={styles.goalRow}>
+                <View style={styles.goalInfo}>
+                    <Text style={styles.goalLabel}>Daily Goal</Text>
+                    <Text style={styles.goalValue}>{Math.round(progress * 100)}%</Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+                </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                    style={[styles.toggleBtn, !showAll && styles.toggleBtnActive]}
+                    onPress={() => setShowAll(false)}
+                >
+                    <Text style={[styles.toggleText, !showAll && styles.toggleTextActive]}>My Assignment</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.toggleBtn, showAll && styles.toggleBtnActive]}
+                    onPress={() => setShowAll(true)}
+                >
+                    <Text style={[styles.toggleText, showAll && styles.toggleTextActive]}>Team Rooms</Text>
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -490,6 +543,9 @@ export default function RoomListScreen() {
                 </>
             )}
 
+            {/* Cleaner Action Panel - Placed here below stats */}
+            {isCleaner && <CleanerActionPanel showAll={cleanerShowAll} setShowAll={setCleanerShowAll} />}
+
             <View style={styles.searchContainer}>
                 <Search size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
                 <TextInput
@@ -515,44 +571,9 @@ export default function RoomListScreen() {
                 </View>
 
                 {isCleaner && (
-                    <View style={{ gap: 12 }}>
-                        {/* Daily Progress Bar */}
-                        {(() => {
-                            // Calculate specific user progress
-                            const myRooms = rooms.filter(r => r.assigned_cleaner === user.id || (user.groupId && r.assignedGroup === user.groupId && !r.assigned_cleaner));
-                            const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
-                            const total = myRooms.length;
-                            const progress = total > 0 ? completed / total : 0;
-
-                            return (
-                                <View style={styles.progressContainer}>
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                                        <Text style={styles.progressLabel}>Daily Goal</Text>
-                                        <Text style={styles.progressValue}>{completed}/{total}</Text>
-                                    </View>
-                                    <View style={styles.progressBarBg}>
-                                        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
-                                    </View>
-                                </View>
-                            );
-                        })()}
-
-                        {/* Segmented Control Filter */}
-                        <View style={styles.segmentedControl}>
-                            <TouchableOpacity
-                                style={[styles.segment, !cleanerShowAll && styles.segmentBtnActive]}
-                                onPress={() => setCleanerShowAll(false)}
-                            >
-                                <Text style={[styles.segmentText, !cleanerShowAll && styles.segmentTextActive]}>My Assignment</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.segment, cleanerShowAll && styles.segmentBtnActive]}
-                                onPress={() => setCleanerShowAll(true)}
-                            >
-                                <Text style={[styles.segmentText, cleanerShowAll && styles.segmentTextActive]}>Team Rooms</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                    <>
+                        {/* Removed old UI, replaced by CleanerActionPanel */}
+                    </>
                 )}
 
                 {isSupervisor && (
@@ -798,14 +819,77 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         backgroundColor: theme.colors.secondary, // Teal/Green
         margin: theme.spacing.m,
-        marginTop: 0,
-        padding: 16,
-        borderRadius: 12,
+        // ... previous styles
+        padding: 12,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
-        ...theme.shadows.float
+        gap: 8
     },
+
+    // --- New Styles ---
+    logoutBtnHeader: {
+        padding: 6,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 16,
+    },
+    cleanerPanel: {
+        backgroundColor: 'white',
+        marginHorizontal: theme.spacing.m,
+        marginBottom: theme.spacing.m,
+        padding: 16,
+        borderRadius: 16,
+        ...theme.shadows.card,
+    },
+    goalRow: {
+        marginBottom: 12,
+    },
+    goalInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    goalLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.colors.textSecondary,
+    },
+    goalValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: theme.colors.border,
+        marginVertical: 12,
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F7FAFC',
+        borderRadius: 12,
+        padding: 4,
+    },
+    toggleBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    toggleBtnActive: {
+        backgroundColor: 'white',
+        ...theme.shadows.card,
+    },
+    toggleText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.colors.textSecondary,
+    },
+    toggleTextActive: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+    },
+
     helpButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 
     searchContainer: {

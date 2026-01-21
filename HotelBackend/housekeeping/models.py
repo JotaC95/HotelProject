@@ -102,14 +102,15 @@ class Room(models.Model):
         return f"Room {self.number} ({self.status}) - {self.assigned_group}"
 
 class Incident(models.Model):
-    PRIORITY_CHOICES = (('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High'))
+    PRIORITY_CHOICES = (('LOW', 'Low'), ('MEDIUM', 'Medium'), ('HIGH', 'High'), ('EMERGENCY', 'Emergency'))
     STATUS_CHOICES = (('OPEN', 'Open'), ('RESOLVED', 'Resolved'))
-    ROLE_CHOICES = (('MAINTENANCE', 'Maintenance'), ('RECEPTION', 'Reception'), ('SUPERVISOR', 'Supervisor'), ('HOUSEMAN', 'Houseman'))
+    ROLE_CHOICES = (('MAINTENANCE', 'Maintenance'), ('RECEPTION', 'Reception'), ('SUPERVISOR', 'Supervisor'), ('HOUSEMAN', 'Houseman'), ('CLEANER', 'Cleaner'))
     CATEGORY_CHOICES = (
         ('MAINTENANCE', 'Maintenance'),
         ('GUEST_REQ', 'Guest Request'),
         ('SUPPLY', 'Supply Request'),
-        ('PREVENTIVE', 'Preventive Maintenance')
+        ('PREVENTIVE', 'Preventive Maintenance'),
+        ('TASK', 'General Task')
     )
 
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='incidents', null=True, blank=True)
@@ -119,6 +120,7 @@ class Incident(models.Model):
     target_role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='MAINTENANCE')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='MAINTENANCE')
     
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_incidents')
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='reported_incidents')
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(blank=True, null=True)

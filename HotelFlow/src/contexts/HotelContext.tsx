@@ -10,7 +10,7 @@ import { useToast } from './ToastContext';
 
 export type RoomStatus = 'PENDING' | 'IN_PROGRESS' | 'INSPECTION' | 'COMPLETED' | 'MAINTENANCE';
 
-export type IncidentRole = 'MAINTENANCE' | 'RECEPTION' | 'SUPERVISOR' | 'HOUSEMAN';
+export type IncidentRole = 'MAINTENANCE' | 'RECEPTION' | 'SUPERVISOR' | 'HOUSEMAN' | 'CLEANER';
 // Duplicate removed
 export type IncidentStatus = 'OPEN' | 'RESOLVED';
 
@@ -33,9 +33,11 @@ export interface Incident {
     targetRole: IncidentRole;
     status: IncidentStatus;
     submittingGroup?: string;
-    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
-    category: 'MAINTENANCE' | 'GUEST_REQ' | 'SUPPLY' | 'PREVENTIVE';
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY';
+    category: 'MAINTENANCE' | 'GUEST_REQ' | 'SUPPLY' | 'PREVENTIVE' | 'TASK';
+    assignedTo?: number; // User ID
 }
+
 
 export interface Staff {
     id: number;
@@ -206,7 +208,7 @@ interface HotelContextType {
     updateRoomDetails: (id: string, updates: Partial<Room>) => Promise<void>;
     toggleGuestInRoom: (id: string, inRoom: boolean) => Promise<void>;
     toggleGuestWaiting: (id: string, waiting: boolean) => Promise<void>; // New
-    addIncident: (id: string, text: string, reporter: string, targetRole: IncidentRole, group?: string, photoUri?: string, category?: Incident['category']) => void;
+    addIncident: (id: string, text: string, reporter: string, targetRole: IncidentRole, group?: string, photoUri?: string, category?: Incident['category'], priority?: Incident['priority'], assignedTo?: number) => void;
     getStats: () => { pending: number; inProgress: number; inspection: number; completed: number };
     exportData: () => object;
 
@@ -219,7 +221,7 @@ interface HotelContextType {
 
     // Phase 26: Cross-Team
     systemIncidents: Incident[];
-    addSystemIncident: (text: string, targetRole: IncidentRole) => Promise<void>;
+    addSystemIncident: (text: string, targetRole: IncidentRole, priority?: Incident['priority'], category?: Incident['category'], assignedTo?: number) => Promise<void>;
     fetchSystemIncidents: () => Promise<Incident[]>;
     fetchRooms: () => Promise<void>;
     deleteRoom: (id: string) => Promise<void>;
@@ -620,7 +622,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const addIncident = async (id: string, text: string, reporter: string, targetRole: IncidentRole, group?: string, photoUri?: string, category: Incident['category'] = 'MAINTENANCE') => {
+    const addIncident = async (id: string, text: string, reporter: string, targetRole: IncidentRole, group?: string, photoUri?: string, category: Incident['category'] = 'MAINTENANCE', priority: Incident['priority'] = 'MEDIUM', assignedTo?: number) => {
         // Optimistic UI Update
         const mockId = Math.random().toString(36).substr(2, 9);
         const newIncident = {
@@ -632,7 +634,9 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             targetRole,
             status: 'OPEN' as IncidentStatus,
             submittingGroup: group,
-            category
+            category,
+            priority,
+            assignedTo
         };
 
         setRooms(prev => prev.map(room => {
@@ -650,10 +654,11 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             await api.post('/housekeeping/incidents/', {
                 room: id,
                 text,
-                priority: 'MEDIUM',
+                priority,
                 targetRole: targetRole,
                 photoUri: photoUri,
-                category: category
+                category: category,
+                assignedTo: assignedTo
             });
             fetchRooms(); // Refresh to get real ID
         } catch (e) {
@@ -996,6 +1001,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             await api.patch(`/housekeeping/rooms/${roomId}/`, { assigned_group: groupId });
             setRooms(prev => prev.map(r => r.id === roomId ? { ...r, assignedGroup: groupId } : r));
             addLog(`Room assigned to Group ${groupId || 'None'}`, 'NOTE');
+            fetchRooms();
         } catch (e) {
             console.error("Failed to assign room group", e);
             Alert.alert("Error", "Could not assign group.");
@@ -1047,18 +1053,21 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     };
 
-    const addSystemIncident = async (text: string, targetRole: IncidentRole) => {
+    const addSystemIncident = async (text: string, targetRole: IncidentRole, priority: Incident['priority'] = 'MEDIUM', category: Incident['category'] = 'TASK', assignedTo?: number) => {
         try {
             await api.post('/housekeeping/incidents/', {
                 text,
-                target_role: targetRole,
-                room: null
+                targetRole: targetRole,
+                room: null,
+                priority,
+                category,
+                assignedTo: assignedTo
             });
             fetchSystemIncidents();
             // Also refresh rooms in case it affects anything (not really needed but safe)
         } catch (e) {
             console.error("Failed to add system incident", e);
-            Alert.alert("Error", "Could not submit help offer.");
+            Alert.alert("Error", "Could not submit task.");
         }
     };
 

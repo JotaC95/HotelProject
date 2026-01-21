@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from './contexts/AuthContext';
-import { Activity, BedDouble, Settings, LogOut } from 'lucide-react-native';
+import { BedDouble, Settings, LogOut } from 'lucide-react-native';
 import { theme } from './utils/theme';
 import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
 
@@ -12,7 +12,7 @@ import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import LoginScreen from './screens/LoginScreen';
 import RoomListScreen from './screens/RoomListScreen';
 import RoomDetailScreen from './screens/RoomDetailScreen';
-import TimelineScreen from './screens/TimelineScreen';
+
 import MaintenanceScreen from './screens/MaintenanceScreen'; // Phase 19
 import ReceptionScreen from './screens/ReceptionScreen'; // Phase 19
 import HousemanScreen from './screens/HousemanScreen'; // Phase 27
@@ -39,7 +39,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
     RoomsTab: undefined;
-    TimelineTab: undefined;
+
     SettingsTab: undefined;
 };
 
@@ -104,14 +104,7 @@ function MainNavigator() {
                     tabBarIcon: ({ color, size }) => <BedDouble color={color} size={size} strokeWidth={2} />,
                 }}
             />
-            <Tab.Screen
-                name="TimelineTab"
-                component={TimelineScreen}
-                options={{
-                    tabBarLabel: 'Activity',
-                    tabBarIcon: ({ color, size }) => <Activity color={color} size={size} strokeWidth={2} />,
-                }}
-            />
+
             <Tab.Screen
                 name="SettingsTab"
                 component={SettingsScreen}

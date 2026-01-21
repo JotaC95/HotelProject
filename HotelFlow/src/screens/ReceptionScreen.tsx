@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, ScrollView } from 'react-native';
-import { useHotel, Room, Staff, CleaningType } from '../contexts/HotelContext';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useHotel, Room, Staff, CleaningType, IncidentRole } from '../contexts/HotelContext';
 import { useAuth } from '../contexts/AuthContext';
 import { theme } from '../utils/theme';
 import { RoomCard } from '../components/RoomCard';
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReceptionScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-    const { rooms, staff, setPriority, fetchStaff, updateStaffGroup, createRoom, startMaintenance, assignRoomToGroup, announcements, addIncident, resolveIncident, moveGuest } = useHotel(); // Added moveGuest
+    const { rooms, staff, setPriority, fetchStaff, updateStaffGroup, createRoom, startMaintenance, assignRoomToGroup, announcements, addIncident, addSystemIncident, resolveIncident, moveGuest } = useHotel(); // Added moveGuest
     const { logout, user } = useAuth();
     const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'STAFF' | 'ROOMS' | 'REQUESTS' | 'TEAMS'>('DASHBOARD'); // Added TEAMS
     const [notificationsVisible, setNotificationsVisible] = useState(false);
@@ -50,6 +50,13 @@ export default function ReceptionScreen() {
     // --- Search & Filter State (Reception 2.0) ---
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'DIRTY' | 'INSPECTION' | 'CLEAN' | 'VIP' | 'VACANT'>('ALL');
+
+    // --- Task Assignment Modal (Ad-hoc) ---
+    const [taskModalVisible, setTaskModalVisible] = useState(false);
+    const [taskDesc, setTaskDesc] = useState('');
+    const [taskRole, setTaskRole] = useState<IncidentRole>('CLEANER');
+    const [taskPriority, setTaskPriority] = useState<'MEDIUM' | 'EMERGENCY'>('MEDIUM');
+    const [taskAssignedTo, setTaskAssignedTo] = useState<number | undefined>(undefined);
 
     // --- Phase 2: Bulk Actions ---
     const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
@@ -89,7 +96,7 @@ export default function ReceptionScreen() {
         const unassignedRooms = rooms.filter(r => !r.assignedGroup && (r.status === 'PENDING' || r.status === 'IN_PROGRESS' || r.status === 'INSPECTION'));
 
         // Extract unique groups from staff
-        const activeGroups = Array.from(new Set(staff.map(s => s.groupId || s.group_id).filter(Boolean))) as string[];
+        const activeGroups = Array.from(new Set(staff.map(s => s.groupId).filter(Boolean))) as string[];
 
         if (activeGroups.length === 0) {
             Alert.alert("No Teams", "Please create teams and assign staff before auto-assigning.");
@@ -236,6 +243,108 @@ export default function ReceptionScreen() {
         Alert.alert("Success", "Guest request logged.");
     };
 
+    const handleCreateTask = () => {
+        if (!taskDesc) {
+            Alert.alert("Error", "Please enter a task description");
+            return;
+        }
+
+        addSystemIncident(taskDesc, taskRole, taskPriority as any, 'TASK', taskAssignedTo);
+        setTaskModalVisible(false);
+        setTaskDesc('');
+        setTaskPriority('MEDIUM');
+        setTaskAssignedTo(undefined);
+        Alert.alert("Success", "Task assigned successfully.");
+    };
+
+    const renderTaskModal = () => (
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={taskModalVisible}
+            onRequestClose={() => setTaskModalVisible(false)}
+        >
+            <KeyboardAvoidingView
+                style={styles.modalOverlay}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Assign New Task</Text>
+
+                        <Text style={styles.label}>Description</Text>
+                        <TextInput
+                            style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                            placeholder="What needs to be done?"
+                            value={taskDesc}
+                            onChangeText={setTaskDesc}
+                            multiline
+                        />
+
+                        <Text style={styles.label}>Assign To (Role)</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow}>
+                            {(['CLEANER', 'MAINTENANCE', 'HOUSEMAN'] as IncidentRole[]).map(r => (
+                                <TouchableOpacity
+                                    key={r}
+                                    style={[styles.typeOption, taskRole === r && styles.typeActive]}
+                                    onPress={() => { setTaskRole(r); setTaskAssignedTo(undefined); }}
+                                >
+                                    <Text style={[styles.typeText, taskRole === r && { color: 'white' }]}>
+                                        {r.charAt(0) + r.slice(1).toLowerCase()}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.label}>Assign Person (Optional)</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow}>
+                            <TouchableOpacity
+                                style={[styles.typeOption, taskAssignedTo === undefined && styles.typeActive]}
+                                onPress={() => setTaskAssignedTo(undefined)}
+                            >
+                                <Text style={[styles.typeText, taskAssignedTo === undefined && { color: 'white' }]}>Any</Text>
+                            </TouchableOpacity>
+                            {staff.filter(s => s.role === taskRole).map(s => (
+                                <TouchableOpacity
+                                    key={s.id}
+                                    style={[styles.typeOption, taskAssignedTo === s.id && styles.typeActive]}
+                                    onPress={() => setTaskAssignedTo(s.id)}
+                                >
+                                    <Text style={[styles.typeText, taskAssignedTo === s.id && { color: 'white' }]}>{s.username}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+
+                        <Text style={styles.label}>Priority</Text>
+                        <View style={styles.typeRow}>
+                            <TouchableOpacity
+                                style={[styles.typeOption, taskPriority === 'MEDIUM' && styles.typeActive]}
+                                onPress={() => setTaskPriority('MEDIUM')}
+                            >
+                                <Text style={[styles.typeText, taskPriority === 'MEDIUM' && { color: 'white' }]}>Normal</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.typeOption, taskPriority === 'EMERGENCY' && { backgroundColor: theme.colors.error }]}
+                                onPress={() => setTaskPriority('EMERGENCY')}
+                            >
+                                <Text style={[styles.typeText, taskPriority === 'EMERGENCY' && { color: 'white' }]}>Emergency</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity onPress={() => setTaskModalVisible(false)} style={styles.modalCancel}>
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleCreateTask} style={styles.modalSubmit}>
+                                <Text style={styles.modalSubmitText}>Assign Task</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+
     useEffect(() => {
         if (activeTab === 'STAFF') {
             fetchStaff();
@@ -275,14 +384,8 @@ export default function ReceptionScreen() {
     };
 
     const handleAssignGroup = (roomId: string, currentGroup?: string) => {
-        // Cycle: No Group -> Group 1 -> Group 2 -> Group 3 -> No Group
-        let nextGroup = '';
-        if (!currentGroup) nextGroup = 'Group 1';
-        else if (currentGroup === 'Group 1') nextGroup = 'Group 2';
-        else if (currentGroup === 'Group 2') nextGroup = 'Group 3';
-        else nextGroup = '';
-
-        assignRoomToGroup(roomId, nextGroup);
+        // Open Modal instead of hardcoded cycle
+        openTeamModal(roomId, false);
     };
 
     // --- Staff Logic ---
@@ -322,6 +425,15 @@ export default function ReceptionScreen() {
                     <Text style={styles.statLabel}>In Room</Text>
                 </View>
             </View>
+
+            {/* Quick Actions */}
+            <TouchableOpacity
+                style={[styles.addButton, { marginBottom: 24, padding: 16, justifyContent: 'center', backgroundColor: '#805AD5' }]}
+                onPress={() => setTaskModalVisible(true)}
+            >
+                <Plus size={20} color="white" />
+                <Text style={[styles.addButtonText, { fontSize: 16 }]}>Create Ad-hoc Task</Text>
+            </TouchableOpacity>
 
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Priority Watchlist</Text>
@@ -503,23 +615,23 @@ export default function ReceptionScreen() {
                                                 </View>
                                             )}
                                         </View>
-                                        <Text style={styles.incidentDesc}>{item.description}</Text>
+                                        <Text style={styles.incidentDesc}>{item.text}</Text>
                                         <Text style={styles.incidentTime}>{new Date(item.timestamp).toLocaleString()}</Text>
                                     </View>
 
                                     <View style={styles.incidentActions}>
                                         <TouchableOpacity
                                             style={styles.resolveBtn}
-                                            onPress={() => resolveIncident(item.roomId, item.id, "Resolved by Reception")}
+                                            onPress={() => resolveIncident(item.roomId, item.id)}
                                         >
                                             <CheckCircle size={16} color="white" />
                                             <Text style={styles.resolveBtnText}>Resolve</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-                                {item.photos && item.photos.length > 0 && (
+                                {item.photoUri && (
                                     <View style={styles.photoContainer}>
-                                        <Text style={styles.photoLabel}>{item.photos.length} Photo(s) Attached</Text>
+                                        <Text style={styles.photoLabel}>1 Photo Attached</Text>
                                     </View>
                                 )}
                             </View>
@@ -741,7 +853,7 @@ export default function ReceptionScreen() {
                                             item.assignedGroup ? styles.groupActionActive : styles.groupActionInactive,
                                             { minWidth: 90, justifyContent: 'center', alignItems: 'center', paddingVertical: 6 }
                                         ]}
-                                        onPress={() => openTeamModal(item.id, false)}
+                                        onPress={() => handleAssignGroup(item.id, item.assignedGroup)}
                                     >
                                         <Briefcase size={14} color={item.assignedGroup ? theme.colors.primary : '#A0AEC0'} style={{ marginBottom: 2 }} />
                                         <Text style={[styles.groupActionText, item.assignedGroup && { color: theme.colors.primary, fontWeight: 'bold' }]}>
@@ -788,49 +900,51 @@ export default function ReceptionScreen() {
             </View>
 
             {/* Navigation Tabs */}
-            <View style={styles.navTabs}>
-                <TouchableOpacity
-                    style={[styles.navTab, activeTab === 'DASHBOARD' && styles.navTabActive]}
-                    onPress={() => setActiveTab('DASHBOARD')}
-                >
-                    <Home size={18} color={activeTab === 'DASHBOARD' ? theme.colors.primary : '#A0AEC0'} />
-                    <Text style={[styles.navTabText, activeTab === 'DASHBOARD' && styles.navTextActive]}>Overview</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.navTab, activeTab === 'STAFF' && styles.navTabActive]}
-                    onPress={() => setActiveTab('STAFF')}
-                >
-                    <Users size={18} color={activeTab === 'STAFF' ? theme.colors.primary : '#A0AEC0'} />
-                    <Text style={[styles.navTabText, activeTab === 'STAFF' && styles.navTextActive]}>Staff</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.navTab, activeTab === 'ROOMS' && styles.navTabActive]}
-                    onPress={() => setActiveTab('ROOMS')}
-                >
-                    <Home size={18} color={activeTab === 'ROOMS' ? theme.colors.primary : '#A0AEC0'} />
-                    <Text style={[styles.navTabText, activeTab === 'ROOMS' && styles.navTextActive]}>Rooms</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.navTab}
-                    onPress={() => navigation.navigate('Roster')}
-                >
-                    <Calendar size={18} color={'#A0AEC0'} />
-                    <Text style={styles.navTabText}>Roster</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.navTab, activeTab === 'REQUESTS' && styles.navTabActive]}
-                    onPress={() => setActiveTab('REQUESTS')}
-                >
-                    <Briefcase size={18} color={activeTab === 'REQUESTS' ? theme.colors.primary : '#A0AEC0'} />
-                    <Text style={[styles.navTabText, activeTab === 'REQUESTS' && styles.navTextActive]}>Requests</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.navTab, activeTab === 'TEAMS' && styles.navTabActive]}
-                    onPress={() => setActiveTab('TEAMS')}
-                >
-                    <Users size={18} color={activeTab === 'TEAMS' ? theme.colors.primary : '#A0AEC0'} />
-                    <Text style={[styles.navTabText, activeTab === 'TEAMS' && styles.navTextActive]}>Teams</Text>
-                </TouchableOpacity>
+            <View style={{ backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#EDF2F7' }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabsContent}>
+                    <TouchableOpacity
+                        style={[styles.navTab, activeTab === 'DASHBOARD' && styles.navTabActive]}
+                        onPress={() => setActiveTab('DASHBOARD')}
+                    >
+                        <Home size={16} color={activeTab === 'DASHBOARD' ? 'white' : '#A0AEC0'} />
+                        <Text style={[styles.navTabText, activeTab === 'DASHBOARD' && styles.navTextActive]}>Overview</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.navTab, activeTab === 'STAFF' && styles.navTabActive]}
+                        onPress={() => setActiveTab('STAFF')}
+                    >
+                        <Users size={16} color={activeTab === 'STAFF' ? 'white' : '#A0AEC0'} />
+                        <Text style={[styles.navTabText, activeTab === 'STAFF' && styles.navTextActive]}>Staff</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.navTab, activeTab === 'ROOMS' && styles.navTabActive]}
+                        onPress={() => setActiveTab('ROOMS')}
+                    >
+                        <Home size={16} color={activeTab === 'ROOMS' ? 'white' : '#A0AEC0'} />
+                        <Text style={[styles.navTabText, activeTab === 'ROOMS' && styles.navTextActive]}>Rooms</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.navTab}
+                        onPress={() => navigation.navigate('Roster')}
+                    >
+                        <Calendar size={16} color={'#A0AEC0'} />
+                        <Text style={styles.navTabText}>Roster</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.navTab, activeTab === 'REQUESTS' && styles.navTabActive]}
+                        onPress={() => setActiveTab('REQUESTS')}
+                    >
+                        <Briefcase size={16} color={activeTab === 'REQUESTS' ? 'white' : '#A0AEC0'} />
+                        <Text style={[styles.navTabText, activeTab === 'REQUESTS' && styles.navTextActive]}>Requests</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.navTab, activeTab === 'TEAMS' && styles.navTabActive]}
+                        onPress={() => setActiveTab('TEAMS')}
+                    >
+                        <Users size={16} color={activeTab === 'TEAMS' ? 'white' : '#A0AEC0'} />
+                        <Text style={[styles.navTabText, activeTab === 'TEAMS' && styles.navTextActive]}>Teams</Text>
+                    </TouchableOpacity>
+                </ScrollView>
             </View>
 
             {activeTab === 'DASHBOARD' && renderDashboard()}
@@ -1097,6 +1211,7 @@ export default function ReceptionScreen() {
                 visible={notificationsVisible}
                 onClose={() => setNotificationsVisible(false)}
             />
+            {renderTaskModal()}
         </View>
     );
 }
@@ -1108,22 +1223,38 @@ const styles = StyleSheet.create({
     headerSubtitle: { fontSize: 13, color: '#718096' },
     logoutButton: { padding: 10, backgroundColor: '#EDF2F7', borderRadius: 8 },
 
-    navTabs: { flexDirection: 'row', backgroundColor: 'white', padding: 8, gap: 8, borderBottomWidth: 1, borderBottomColor: '#EDF2F7' },
-    navTab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8, gap: 6 },
-    navTabActive: { backgroundColor: '#EBF8FF' },
-    navTabText: { fontWeight: '600', color: '#A0AEC0' },
-    navTextActive: { color: theme.colors.primary },
+    navTabsContent: { flexDirection: 'row', padding: 16, gap: 16 },
+    navTab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12, // More vertical padding
+        paddingHorizontal: 20, // More horizontal padding
+        borderRadius: 24, // Rounder
+        gap: 8,
+        backgroundColor: '#F7FAFC',
+        borderWidth: 1,
+        borderColor: '#EDF2F7',
+        minWidth: 110 // Slightly wider
+    },
+    navTabActive: {
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
+        transform: [{ scale: 1.02 }] // Subtle pop
+    },
+    navTabText: { fontWeight: '600', color: '#A0AEC0', fontSize: 13 },
+    navTextActive: { color: 'white' }, // Explicit white for active
 
-    content: { flex: 1, padding: 16 },
-    statsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 }, // Added wrap
+    content: { flex: 1, padding: 20 }, // Increased padding
+    statsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 24 }, // Increased gap
     statCard: {
-        minWidth: '30%',
+        minWidth: '28%', // Slightly smaller min to ensure fit with larger gap
         flex: 1,
         backgroundColor: theme.colors.card, // Use theme
         padding: 16,
         borderRadius: 16, // More premium radius
         alignItems: 'center',
-        shadowColor: theme.colors.shadow,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 12,
@@ -1146,7 +1277,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginBottom: 8,
         alignItems: 'center',
-        shadowColor: theme.colors.shadow,
+        shadowColor: '#000',
         shadowOpacity: 0.05,
         shadowRadius: 5,
         elevation: 2
@@ -1161,7 +1292,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 16,
         marginBottom: 16,
-        shadowColor: theme.colors.shadow,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -1210,7 +1341,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
         marginBottom: 12,
-        shadowColor: theme.colors.shadow,
+        shadowColor: '#000',
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2

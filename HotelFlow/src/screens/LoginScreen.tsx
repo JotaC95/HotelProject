@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyRound, Lock, User } from 'lucide-react-native';
 
 const LoginScreen = () => {
-    const [username, setUsername] = useState('Ramiro');
-    const [password, setPassword] = useState('password123');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
     const { login, isLoading } = useAuth();
 
     const handleLogin = async () => {

@@ -15,7 +15,14 @@ const api = axios.create({
 api.interceptors.response.use(
   response => response,
   error => {
-    // console.log('API Error:', error.message);
+    if (error.response) {
+      console.error(`API Error: [${error.config.method?.toUpperCase()}] ${error.config.url} | Status: ${error.response.status}`);
+      console.error('Response Data:', JSON.stringify(error.response.data));
+    } else if (error.request) {
+      console.error(`API Error: [${error.config.method?.toUpperCase()}] ${error.config.url} | No Response`);
+    } else {
+      console.error('API Error:', error.message);
+    }
     return Promise.reject(error);
   }
 );

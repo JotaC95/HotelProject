@@ -68,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Register for Push Notifications
             registerForPushNotificationsAsync().then(token => {
                 if (token) {
-                    api.patch(`/users/${response.data.id}/`, { expo_push_token: token }).catch(console.error);
+                    api.patch(`/users/${response.data.user_id}/`, { expo_push_token: token }).catch(console.error);
                 }
             });
 

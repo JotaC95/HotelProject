@@ -28,6 +28,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Allow NFC scanning to track room entry and exit."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "d2319279-641e-470d-8cff-32731504bb0d"

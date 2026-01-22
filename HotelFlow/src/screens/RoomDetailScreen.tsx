@@ -12,6 +12,7 @@ import { Image } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '../contexts/ToastContext';
+import NfcManager, { NfcTech } from '../utils/SafeNfc';
 
 type RoomDetailRouteProp = RouteProp<RoomStackParamList, 'RoomDetail'>;
 
@@ -283,6 +284,66 @@ export default function RoomDetailScreen() {
 
     const [isAddingIncident, setIsAddingIncident] = useState(false);
     const [isTranslating, setIsTranslating] = useState(false);
+    const [isNfcSupported, setIsNfcSupported] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+
+    // NFC Initialization (Safe for Expo Go)
+    useEffect(() => {
+        const checkNfc = async () => {
+            try {
+                const supported = await NfcManager.isSupported();
+                if (supported) {
+                    await NfcManager.start();
+                    setIsNfcSupported(true);
+                }
+            } catch (e) {
+                // Silently fail in Expo Go or non-NFC devices
+                console.log("NFC Not Supported or Expo Go Env");
+            }
+        };
+        checkNfc();
+
+        return () => {
+            // Clean up
+            NfcManager.cancelTechnologyRequest().catch(() => 0);
+        };
+    }, []);
+
+    // NFC Scanning Logic
+    const startNfcScan = async () => {
+        if (!isNfcSupported) return;
+
+        try {
+            setIsScanning(true);
+            // Register for any tag
+            await NfcManager.requestTechnology(NfcTech.Ndef);
+            const tag = await NfcManager.getTag();
+
+            if (tag) {
+                // LOGIC: Check if Tag corresponds to Room
+                // For MVP, ANY tag scans triggers the action for the current room
+                // In production, you would check: if (tag.id === room.nfcTagId)
+
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+                if (room?.status === 'PENDING') {
+                    startCleaning(room.id);
+                    showToast(`NFC: Started Room ${room.number}`, 'SUCCESS');
+                } else if (room?.status === 'IN_PROGRESS') {
+                    handleAction(); // Trigger completion flow
+                    showToast(`NFC: Completed Room ${room.number}`, 'SUCCESS');
+                }
+            } // End Tag Check
+
+        } catch (ex) {
+            console.warn('NFC Scan Error', ex);
+            // Cancelled or Error
+        } finally {
+            // Clean up
+            NfcManager.cancelTechnologyRequest();
+            setIsScanning(false);
+        }
+    };
 
     // Edit Mode State
     const [isEditing, setIsEditing] = useState(false);
@@ -611,6 +672,13 @@ export default function RoomDetailScreen() {
                             <Text style={styles.zenSubtitle}>{room.cleaningType} Cleaning</Text>
                         </View>
                         <View style={styles.zenTimerContainer}>
+                            {isNfcSupported && (
+                                <TouchableOpacity onPress={startNfcScan} style={{ marginRight: 10 }}>
+                                    <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 4, borderRadius: 20 }}>
+                                        <Text style={{ fontSize: 10, color: 'white', fontWeight: 'bold' }}>NFC READY</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
                             <Clock size={20} color="white" style={{ marginRight: 6 }} />
                             <Stopwatch startTime={room.cleaningStartedAt} />
                         </View>

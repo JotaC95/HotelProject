@@ -1,329 +1,593 @@
 {
-    "date": "2026-01-22",
-    "property": "Quest Williamstown North",
-    "teams": {
-        "team_1": {
-            "total_rooms": 16,
+    "hotel_name": "Quest Williamstown North",
+    "date": "2026-01-23",
+    "teams": [
+        {
+            "team_name": "Team 1 (1 - 19)",
             "rooms": [
                 {
-                    "room": "01",
-                    "res_no": "6077785",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock 2nd bedroom, 1 king"
-                },
-                {
-                    "room": "01",
-                    "res_no": "6121823",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Lock second bedroom, 1 king"
-                },
-                {
-                    "room": "02",
-                    "res_no": "6089726",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom, 1 king"
-                },
-                {
-                    "room": "02",
-                    "res_no": "5966097",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Unlock second bedroom, 2 kings"
-                },
-                {
-                    "room": "06",
-                    "res_no": "5943022",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Unlock second bedroom"
-                },
-                {
-                    "room": "06",
-                    "res_no": "6015739",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Unlock both bedrooms, ETA 16:00"
-                },
-                {
-                    "room": "09",
-                    "res_no": "6066661",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second & third bedroom"
-                },
-                {
-                    "room": "11",
-                    "res_no": "6089724",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "11",
-                    "res_no": "5967945",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Unlock second bedroom"
-                },
-                {
-                    "room": "15",
-                    "res_no": "5986574",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom, 1 queen"
-                },
-                {
-                    "room": "15",
-                    "res_no": "5714675",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "1 queen"
-                },
-                {
-                    "room": "16",
-                    "res_no": "6089727",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "16",
-                    "res_no": "6024880",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "1 king + 2 singles, ETA 16:00"
-                },
-                {
-                    "room": "17",
-                    "res_no": "6089725",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "17",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "17",
                     "res_no": "5936164",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Lock second room, ETA will pick"
-                },
-                {
-                    "room": "20",
-                    "res_no": "6084221",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                }
-            ]
-        },
-        "team_2": {
-            "total_rooms": 13,
-            "rooms": [
-                {
-                    "room": "22",
-                    "res_no": "5943023",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Unlock second bedroom"
-                },
-                {
-                    "room": "22",
-                    "res_no": "6112740",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "2 kings, ETA late"
-                },
-                {
-                    "room": "24",
-                    "res_no": "6085243",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Open second bedroom"
-                },
-                {
-                    "room": "27",
-                    "res_no": "6072216",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "28",
-                    "res_no": "6072253",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "29",
-                    "res_no": "6084708",
-                    "in_out": null,
-                    "task": "Departure",
-                    "notes": "2A 1C, unlock second bedroom"
-                },
-                {
-                    "room": "30",
-                    "res_no": "5989730",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Accessible room"
-                },
-                {
-                    "room": "32",
-                    "res_no": "6089682",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Conference room"
-                },
-                {
-                    "room": "33",
-                    "res_no": "6021005",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second room"
-                },
-                {
-                    "room": "34",
-                    "res_no": "6087728",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "34",
-                    "res_no": "6095212",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "ETA 6pm"
-                },
-                {
-                    "room": "35",
-                    "res_no": "6084222",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Lock second bedroom"
-                },
-                {
-                    "room": "35",
-                    "res_no": "6046890",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "ETA 16:30"
-                }
-            ]
-        },
-        "team_3": {
-            "total_rooms": 15,
-            "rooms": [
-                {
-                    "room": "38",
-                    "res_no": "6093421",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "Maintenance in"
-                },
-                {
-                    "room": "47",
-                    "res_no": "6058631",
-                    "in_out": null,
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "26 Jan 2026 (4)",
                     "task": "Rubbish Removal",
-                    "notes": "Unlock 2nd & 3rd room, 2 kings"
+                    "task_status": "Incomplete",
+                    "notes": "lock second room WEEKLY ANYTIME 9"
                 },
                 {
-                    "room": "49",
-                    "res_no": "6085868",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "1 king"
+                    "room_type": "2KT - 2 Bedroom - 106",
+                    "room_number": "13",
+                    "res_no": "6105306",
+                    "status_in_out": null,
+                    "people": "3A",
+                    "depart_date": "25 Feb 2026 (40)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "UNLOCK 2ND BEDROOM"
                 },
                 {
-                    "room": "49",
-                    "res_no": "5885412",
-                    "in_out": "In",
+                    "room_type": "3KKT - 3 Bedroom - 106",
+                    "room_number": "12",
+                    "res_no": "5957491",
+                    "status_in_out": "(In)",
+                    "people": "3A",
+                    "depart_date": "24 Jan 2026 (1)",
                     "task": "Pre Arrival Check",
-                    "notes": "2 kings"
+                    "task_status": "Incomplete",
+                    "notes": "UNLOCK 2ND BEDROOM 1 x king 2 x singles ETA: 1900"
                 },
                 {
-                    "room": "49",
-                    "res_no": "6093221",
-                    "in_out": null,
+                    "room_type": "3KKT - 3 Bedroom - 106",
+                    "room_number": "12",
+                    "res_no": "5526826",
+                    "status_in_out": "(Out)",
+                    "people": "4A 2C",
+                    "depart_date": "23 Jan 2026 (3)",
                     "task": "Departure",
-                    "notes": "No-show room clean"
+                    "task_status": "Incomplete",
+                    "notes": "lock third bedroom confirm bedding."
                 },
                 {
-                    "room": "50",
-                    "res_no": "6062279",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "1 king + 2 singles"
-                },
-                {
-                    "room": "51",
-                    "res_no": "6085869",
-                    "in_out": "Out",
-                    "task": "Departure",
-                    "notes": "1 king"
-                },
-                {
-                    "room": "51",
-                    "res_no": "6033946",
-                    "in_out": "In",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "11",
+                    "res_no": "5712522",
+                    "status_in_out": "(In)",
+                    "people": "2A",
+                    "depart_date": "25 Jan 2026 (2)",
                     "task": "Pre Arrival Check",
-                    "notes": "1 king"
+                    "task_status": "Incomplete",
+                    "notes": "unlock 2nd bedroom 2king"
                 },
                 {
-                    "room": "55",
-                    "res_no": "5986998",
-                    "in_out": "Out",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "11",
+                    "res_no": "6126673",
+                    "status_in_out": "(Out)",
+                    "people": "2A",
+                    "depart_date": "23 Jan 2026 (1)",
                     "task": "Departure",
-                    "notes": "1 king"
+                    "task_status": "Incomplete",
+                    "notes": "unlock second br 1 x queen"
                 },
                 {
-                    "room": "57",
-                    "res_no": "6088264",
-                    "in_out": "Out",
-                    "task": "Departure",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "10",
+                    "res_no": "6112445",
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "24 Jan 2026 (1)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
                     "notes": "Lock second bedroom"
                 },
                 {
-                    "room": "57",
-                    "res_no": "6084480",
-                    "in_out": "In",
-                    "task": "Pre Arrival Check",
-                    "notes": "Early arrival 11am (not guaranteed), ETA 12pm"
-                },
-                {
-                    "room": "58",
-                    "res_no": "6047238",
-                    "in_out": "Out",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "10",
+                    "res_no": "6000888",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (4)",
                     "task": "Departure",
-                    "notes": "1 king"
+                    "task_status": "Incomplete",
+                    "notes": "LOCK THE SECOND BEDROOM X1KING"
                 },
                 {
-                    "room": "58",
-                    "res_no": "5624811",
-                    "in_out": "In",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "09",
+                    "res_no": "5967945",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "27 Jan 2026 (5)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second bedroom 2 x king"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "07",
+                    "res_no": "5980810",
+                    "status_in_out": "(In)",
+                    "people": "2A",
+                    "depart_date": "25 Jan 2026 (2)",
                     "task": "Pre Arrival Check",
-                    "notes": "VIP"
+                    "task_status": "Incomplete",
+                    "notes": "1 x queen"
                 },
                 {
-                    "room": "60",
-                    "res_no": "6104987",
-                    "in_out": "Out",
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "07",
+                    "res_no": "6003789",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (4)",
                     "task": "Departure",
-                    "notes": "1 queen"
+                    "task_status": "Incomplete",
+                    "notes": "Lock second bedroom"
                 },
                 {
-                    "room": "60",
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "06",
+                    "res_no": "6015739",
+                    "status_in_out": null,
+                    "people": "1A 1C",
+                    "depart_date": "26 Jan 2026 (4)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "lock second room"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "05",
+                    "res_no": "6052628",
+                    "status_in_out": null,
+                    "people": "2A 1C",
+                    "depart_date": "26 Jan 2026 (5)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "Unlock both bedrooms 2 x kings"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "04",
+                    "res_no": "5805442",
+                    "status_in_out": null,
+                    "people": "3A",
+                    "depart_date": "05 Nov 2026 (365)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room 1 king 2 singles Invoice every Wednesday (Inhouse)"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "02",
+                    "res_no": "5966097",
+                    "status_in_out": null,
+                    "people": "3A",
+                    "depart_date": "27 Jan 2026 (5)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "unlock 2nd bedroom x2kings"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "01",
+                    "res_no": "6121823",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "27 Jan 2026 (5)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "lock the second bedroom x1king"
+                },
+                {
+                    "room_type": "2KT - 2 Bedroom - 106",
+                    "room_number": "18",
+                    "res_no": "6023098",
+                    "status_in_out": null,
+                    "people": "3A",
+                    "depart_date": "28 Jan 2026 (23)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "Unlock both bedrooms 1 KING 2 SINGLES early arrival 11am guaranteed had open heart surgery unlock the second bedroom"
+                }
+            ]
+        },
+        {
+            "team_name": "Team 2 (20 - 43)",
+            "rooms": [
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "43",
+                    "res_no": "5828379",
+                    "status_in_out": null,
+                    "people": "2A 3C",
+                    "depart_date": "06 Feb 2026 (20)",
+                    "task": "Weekly Service",
+                    "task_status": "Incomplete",
+                    "notes": "lock the second bedroom x1king"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "39",
+                    "res_no": "6083154",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "01 Feb 2026 (19)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "unlock all beds 2 kings 4 singles"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "38",
+                    "res_no": "6050867",
+                    "status_in_out": "(In)",
+                    "people": "2A 3C",
+                    "depart_date": "26 Jan 2026 (3)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "lock the second bedroom"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "34b",
+                    "res_no": "6107637",
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "UNLOCK 2ND BEDROOM"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "34b",
+                    "res_no": "6128138",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "ETA : 2-3pm"
+                },
+                {
+                    "room_type": "1QA - 1 Bedroom Accessible - 106",
+                    "room_number": "34a",
+                    "res_no": "6127281",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "Lock second room 1 x queen"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "33",
+                    "res_no": "5928005",
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "ETA: 1500"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "33",
+                    "res_no": "6095212",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "lock the second bedroom"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "32",
+                    "res_no": "6124424",
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "conference room set up 10 people U shape"
+                },
+                {
+                    "room_type": "1Q - 1 Bedroom - 106",
+                    "room_number": "32",
+                    "res_no": "5927321",
+                    "status_in_out": "(In)",
+                    "people": "1A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "lock the second bedroom"
+                },
+                {
+                    "room_type": "1QA - 1 Bedroom Accessible - 106",
+                    "room_number": "31",
+                    "res_no": "5745127",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "05 Feb 2026 (26)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "lock 2nd bedroom x1king + rollaway bed"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "28",
+                    "res_no": "6113128",
+                    "status_in_out": "(In)",
+                    "people": "6A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "lock 2nd bedroom ETA: 1pm"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "27",
+                    "res_no": "6113127",
+                    "status_in_out": "(In)",
+                    "people": "6A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "x2kings ETA: 1pm"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "27",
+                    "res_no": "6127534",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "unlock 2nd bedroom 1 x king"
+                },
+                {
+                    "room_type": "3KKT - 3 Bedroom - 106",
+                    "room_number": "26",
+                    "res_no": "6074178",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "02 Mar 2026 (48)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "Lock second bedroom clean fly screen doors (get seb to)"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "25",
+                    "res_no": "6113129",
+                    "status_in_out": "(In)",
+                    "people": "6A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "unlock all beds 3 king beds 1pm early arrival"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "25",
+                    "res_no": "6094568",
+                    "status_in_out": "(Out)",
+                    "people": "2A",
+                    "depart_date": "23 Jan 2026 (8)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "long stay - extra towels on weekly"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "24",
+                    "res_no": "6113126",
+                    "status_in_out": "(In)",
+                    "people": "6A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "unlock 2nd bedroom 2 kings ETA: 1pm"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "23",
+                    "res_no": "6003448",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "08 Feb 2026 (34)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "unlock 2nd bedroom ETA: 1pm"
+                },
+                {
+                    "room_type": "2KK - 2 Bedroom - 106",
+                    "room_number": "21",
+                    "res_no": "5985319",
+                    "status_in_out": "(In)",
+                    "people": "4A",
+                    "depart_date": "25 Jan 2026 (2)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "lock second bedroom x1king"
+                }
+            ]
+        },
+        {
+            "team_name": "Team 3 (44 - 62)",
+            "rooms": [
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "62",
+                    "res_no": "4977771",
+                    "status_in_out": null,
+                    "people": "2A",
+                    "depart_date": "05 Feb 2026 (187)",
+                    "task": "Weekly Service",
+                    "task_status": "Incomplete",
+                    "notes": "PLEASE LEAVE EXTRA TOWELS!!!!"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "60",
                     "res_no": "6061122",
-                    "in_out": "In",
+                    "status_in_out": "(Out)",
+                    "people": "2A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "Unlock second room a king bed please."
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "59",
+                    "res_no": "6095586",
+                    "status_in_out": null,
+                    "people": "2A",
+                    "depart_date": "28 Jan 2026 (10)",
+                    "task": "Weekly Service",
+                    "task_status": "Incomplete",
+                    "notes": "make 2nd bedroom into 1 queen"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "57",
+                    "res_no": "6044352",
+                    "status_in_out": "(In)",
+                    "people": "3A",
+                    "depart_date": "25 Jan 2026 (2)",
                     "task": "Pre Arrival Check",
-                    "notes": "Make 2nd bedroom a king"
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "57",
+                    "res_no": "6084480",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "56",
+                    "res_no": "5921631",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "31 Jan 2026 (38)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "Lock second bedroom 1 x king"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "55",
+                    "res_no": "6107775",
+                    "status_in_out": "(In)",
+                    "people": "4A",
+                    "depart_date": "27 Jan 2026 (4)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room 1 king 2 singles ETA: 3pm"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "55",
+                    "res_no": "6128113",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (1)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room 2 kings ETA: 16:30"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "54",
+                    "res_no": "5841535",
+                    "status_in_out": "(In)",
+                    "people": "2A",
+                    "depart_date": "27 Jan 2026 (4)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "54",
+                    "res_no": "5974699",
+                    "status_in_out": "(Out)",
+                    "people": "1A",
+                    "depart_date": "23 Jan 2026 (3)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "unlock second room"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "52",
+                    "res_no": "6007085",
+                    "status_in_out": null,
+                    "people": "2A",
+                    "depart_date": "31 Jan 2026 (41)",
+                    "task": "Rubbish Removal",
+                    "task_status": "Incomplete",
+                    "notes": "VIP - Long Stay Guest (Inhouse) MONDAY AFTER 12PM"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "50",
+                    "res_no": "5895403",
+                    "status_in_out": "(In)",
+                    "people": "2A",
+                    "depart_date": "07 Feb 2026 (15)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "WEEKLY SERVICE Invoice every monday 2 x kings"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "48",
+                    "res_no": "6107591",
+                    "status_in_out": "(Out)",
+                    "people": "2A",
+                    "depart_date": "23 Jan 2026 (4)",
+                    "task": "Departure",
+                    "task_status": "Incomplete",
+                    "notes": "Unlock both bedrooms 1 x king"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "46",
+                    "res_no": "6101372",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "18 Mar 2026 (59)",
+                    "task": "Weekly Service",
+                    "task_status": "Incomplete",
+                    "notes": "Lock second bedroom"
+                },
+                {
+                    "room_type": "1EQ - 1 Bedroom Executive - 106",
+                    "room_number": "45",
+                    "res_no": "6112881",
+                    "status_in_out": null,
+                    "people": "1A",
+                    "depart_date": "24 Jan 2026 (4)",
+                    "task": "Pre Arrival Check",
+                    "task_status": "Incomplete",
+                    "notes": "lock second bedroom x1king"
                 }
             ]
         }
-    }
+    ]
 }

@@ -4,6 +4,7 @@ import { useHotel, Room, IncidentRole, RoomStatus } from '../contexts/HotelConte
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { RoomCard } from '../components/RoomCard';
 import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
+import { DayTimer } from '../components/DayTimer';
 import { theme } from '../utils/theme';
 import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react-native'; // Clean icon for help
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -16,50 +17,7 @@ import { RoomStackParamList, RootStackParamList } from '../AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const TimerDisplay = ({ totalMinutes }: { totalMinutes: number }) => {
-    const { session } = useHotel();
-    const [elapsed, setElapsed] = React.useState(0);
 
-    React.useEffect(() => {
-        if (!session.isActive || !session.startTime) {
-            setElapsed(0);
-            return;
-        }
-
-        const interval = setInterval(() => {
-            const start = new Date(session.startTime!).getTime();
-            const now = new Date().getTime();
-            setElapsed(Math.floor((now - start) / 1000));
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [session.isActive, session.startTime]);
-
-    const totalSeconds = totalMinutes * 60;
-    const remaining = totalSeconds - elapsed;
-    const isOvertime = remaining < 0;
-    const absRemaining = Math.abs(remaining);
-
-    const formatTime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
-    if (!session.isActive) return null;
-
-    return (
-        <View style={[styles.timerCard, isOvertime ? styles.timerOvertime : null]}>
-            <Text style={styles.timerLabel}>
-                {isOvertime ? 'Overtime By' : 'Time Remaining'}
-            </Text>
-            <Text style={styles.timerValue}>
-                {isOvertime ? '+' : ''}{formatTime(absRemaining)}
-            </Text>
-        </View>
-    );
-};
 
 const DashboardHeader = () => {
     const { user, logout } = useAuth();
@@ -462,9 +420,10 @@ export default function RoomListScreen() {
                 const isHighPriorityType = r.cleaningType === 'PREARRIVAL' || r.cleaningType === 'DEPARTURE';
                 const isOccupied = r.guestStatus === 'GUEST_IN_ROOM' || r.guestStatus === 'DND'; // Treat DND as occupied for safety
 
-                if (isHighPriorityType && isOccupied) {
-                    score += 100; // Penalize Heavily -> Moves to bottom (Score 101/102)
-                }
+                // REMOVED PENALTY: User wants blocked rooms to respect priority order.
+                // if (isHighPriorityType && isOccupied) {
+                //    score += 100; 
+                // }
 
                 // NEW: Push Completed/Inspection to absolute bottom (User Request: "ubiquen al final")
                 if (r.status === 'COMPLETED' || r.status === 'INSPECTION') {
@@ -503,6 +462,35 @@ export default function RoomListScreen() {
     const totalTimeFormatted = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 
     const handleRoomPress = (room: Room) => {
+        const isOccupied = room.guestStatus === 'GUEST_IN_ROOM' || room.guestStatus === 'DND';
+
+        if (isOccupied) {
+            Alert.alert(
+                "Guest in Room",
+                `Verify if guest is present in Room ${room.number}.`,
+                [
+                    { text: "Cancel", style: 'cancel' },
+                    {
+                        text: "Notify Reception",
+                        onPress: () => {
+                            addSystemIncident(`Room ${room.number} is BLOCKED (Guest In). Please call to verify vacancy.`, 'RECEPTION');
+                            Alert.alert("Reception Notified", "Request sent.");
+                        },
+                        style: 'default'
+                    },
+                    {
+                        text: "Guest Left (Enter)",
+                        onPress: () => {
+                            // Proceed to detail
+                            navigation.navigate('RoomDetail', { roomId: room.id });
+                        },
+                        style: 'destructive'
+                    }
+                ]
+            );
+            return;
+        }
+
         navigation.navigate('RoomDetail', { roomId: room.id });
     };
 
@@ -531,7 +519,7 @@ export default function RoomListScreen() {
                 <SupervisorTeamDashboard />
             ) : (
                 <>
-                    <TimerDisplay totalMinutes={totalMinutes} />
+                    <DayTimer totalMinutes={totalMinutes} />
 
                     {/* Team Header */}
                     {user?.groupId && (
@@ -1104,30 +1092,7 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '600',
     },
-    timerCard: {
-        backgroundColor: theme.colors.secondary,
-        marginHorizontal: theme.spacing.m,
-        marginTop: theme.spacing.m,
-        padding: theme.spacing.m,
-        borderRadius: theme.borderRadius.m,
-        alignItems: 'center',
-        ...theme.shadows.card,
-    },
-    timerOvertime: {
-        backgroundColor: theme.colors.error,
-    },
-    timerLabel: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    timerValue: {
-        color: 'white',
-        fontSize: 32,
-        fontWeight: '800',
-        fontVariant: ['tabular-nums'],
-    },
+
     badgeDot: {
         position: 'absolute',
         top: -2,

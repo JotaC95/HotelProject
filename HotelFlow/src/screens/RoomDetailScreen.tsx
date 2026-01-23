@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, TextInput, Alert, KeyboardAvoidingView, Platform, LayoutAnimation, Modal, TouchableWithoutFeedback } from 'react-native';
+import { SwipeToStart } from '../components/SwipeToStart';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RoomStackParamList } from '../AppNavigator';
 import { useHotel, Room, RoomStatus, INCIDENT_PRESETS, IncidentRole, CleaningType } from '../contexts/HotelContext'; // Imported presets
@@ -31,9 +32,10 @@ const Stopwatch = ({ startTime }: { startTime?: string }) => {
     }, [startTime]);
 
     const format = (sec: number) => {
-        const m = Math.floor(sec / 60);
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
         const s = sec % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     return <Text style={styles.zenTimerText}>{format(elapsed)}</Text>;
@@ -286,6 +288,29 @@ export default function RoomDetailScreen() {
     const [isTranslating, setIsTranslating] = useState(false);
     const [isNfcSupported, setIsNfcSupported] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
+
+    // Local Supplies State (Debounced Save)
+    const [localSupplies, setLocalSupplies] = useState(room?.supplies_used || {});
+    // Sync only on mount/room id change, NOT on every poll to avoid overwrite
+    useEffect(() => {
+        if (room?.supplies_used && Object.keys(localSupplies).length === 0) {
+            setLocalSupplies(room.supplies_used);
+        }
+    }, [room?.id]); // Only reset if room ID changes (navigation)
+
+    // Debounced Save Effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            // Only save if different from prop (and not empty initial)
+            if (room && JSON.stringify(localSupplies) !== JSON.stringify(room.supplies_used)) {
+                console.log("Saving supplies...", localSupplies);
+                updateSupplies(room.id, localSupplies);
+            }
+        }, 1500); // 1.5s debounce
+
+        return () => clearTimeout(timer);
+    }, [localSupplies]);
+
 
     // NFC Initialization (Safe for Expo Go)
     useEffect(() => {
@@ -665,6 +690,41 @@ export default function RoomDetailScreen() {
             {/* 5. CLEANER VIEW (Existing Zen Mode) */}
             {(user?.role === 'CLEANER' && room.status === 'IN_PROGRESS') ? (
                 <View style={styles.zenContainer}>
+                    {/* Guest & Supply Actions (Moved from List) */}
+                    <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', gap: 10 }}>
+                        {/* Guest Status Toggle */}
+                        {room.guestStatus === 'GUEST_IN_ROOM' ? (
+                            <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#E0F2FE', flex: 1, borderColor: '#7DD3FC' }]} onPress={handleGuestLeft}>
+                                <UserCheck size={20} color="#0284C7" />
+                                <Text style={[styles.zenFastBtnText, { color: '#0284C7' }]}>Guest Left?</Text>
+                            </TouchableOpacity>
+                        ) : room.guestStatus !== 'DND' && (
+                            <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#FEF9C3', flex: 1, borderColor: '#FDE047' }]} onPress={() => updateGuestStatus(room.id, 'GUEST_IN_ROOM')}>
+                                <UserCheck size={20} color="#CA8A04" />
+                                <Text style={[styles.zenFastBtnText, { color: '#CA8A04' }]}>Guest Is In</Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Linen Request */}
+                        <TouchableOpacity
+                            style={[styles.zenFastBtn, { backgroundColor: '#F3E8FF', flex: 1, borderColor: '#D8B4FE' }]}
+                            onPress={() => {
+                                Alert.alert("Request Linen", "Notify Houseman?", [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Request", onPress: () => {
+                                            addIncident(room.id, 'Linen Kits Missing', user?.username || 'Cleaner', 'HOUSEMAN', undefined, undefined, 'SUPPLY');
+                                            showToast('Linen Requested', 'SUCCESS');
+                                        }
+                                    }
+                                ]);
+                            }}
+                        >
+                            <Package size={20} color="#9333EA" />
+                            <Text style={[styles.zenFastBtnText, { color: '#9333EA' }]}>Need Linen</Text>
+                        </TouchableOpacity>
+                    </View>
+
                     {/* Live Timer Header */}
                     <View style={styles.zenHeader}>
                         <View>
@@ -684,18 +744,7 @@ export default function RoomDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Team Members */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 }}>
-                        <Text style={{ color: theme.colors.textSecondary, marginRight: 8, fontSize: 13, fontWeight: '600' }}>TEAM:</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {staff.filter(s => s.groupId === user?.groupId).map((s, i) => (
-                                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, marginRight: 6, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.success, marginRight: 6 }} />
-                                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.text }}>{s.username}</Text>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
+
 
                     <ScrollView style={styles.zenContent} contentContainerStyle={{ paddingBottom: 100 }}>
 
@@ -866,15 +915,15 @@ export default function RoomDetailScreen() {
                                         <View style={styles.counterRow}>
                                             <TouchableOpacity
                                                 style={styles.counterBtn}
-                                                onPress={() => updateSupplies(room.id, { ...room.supplies_used, [item]: Math.max(0, (room.supplies_used?.[item] || 0) - 1) })}
+                                                onPress={() => setLocalSupplies(prev => ({ ...prev, [item]: Math.max(0, (prev[item] || 0) - 1) }))}
                                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                             >
                                                 <Text style={styles.counterBtnText}>-</Text>
                                             </TouchableOpacity>
-                                            <Text style={styles.counterValue}>{room.supplies_used?.[item] || 0}</Text>
+                                            <Text style={styles.counterValue}>{localSupplies[item] || 0}</Text>
                                             <TouchableOpacity
                                                 style={styles.counterBtn}
-                                                onPress={() => updateSupplies(room.id, { ...room.supplies_used, [item]: (room.supplies_used?.[item] || 0) + 1 })}
+                                                onPress={() => setLocalSupplies(prev => ({ ...prev, [item]: (prev[item] || 0) + 1 }))}
                                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                             >
                                                 <Text style={styles.counterBtnText}>+</Text>
@@ -903,119 +952,121 @@ export default function RoomDetailScreen() {
                         animationType="slide"
                         onRequestClose={() => setAlertConfig({ ...alertConfig, visible: false })}
                     >
-                        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-                            <View style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 400 }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                                    <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-                                        {alertConfig.type === 'BROKEN' ? 'Report Broken Item' :
-                                            alertConfig.type === 'MISSING' ? 'Report Missing Item' : 'New Report'}
-                                    </Text>
-                                    <TouchableOpacity onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
-                                        <X size={24} color="#6B7280" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Presets Grid */}
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-                                    {(alertConfig.type === 'BROKEN' ? BROKEN_PRESETS : alertConfig.type === 'MISSING' ? MISSING_PRESETS : []).map(preset => (
-                                        <TouchableOpacity
-                                            key={preset}
-                                            style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' }}
-                                            onPress={() => setAlertText(preset)}
-                                        >
-                                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>{preset}</Text>
+                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+                            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                                <View style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: 400 }}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                                        <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
+                                            {alertConfig.type === 'BROKEN' ? 'Report Broken Item' :
+                                                alertConfig.type === 'MISSING' ? 'Report Missing Item' : 'New Report'}
+                                        </Text>
+                                        <TouchableOpacity onPress={() => setAlertConfig({ ...alertConfig, visible: false })}>
+                                            <X size={24} color="#6B7280" />
                                         </TouchableOpacity>
-                                    ))}
-                                </View>
+                                    </View>
 
-                                {/* Role Selector */}
-                                <View style={{ marginBottom: 16 }}>
-                                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' }}>Assign To:</Text>
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                                        {(['MAINTENANCE', 'HOUSEMAN', 'RECEPTION', 'SUPERVISOR'] as const).map(role => {
-                                            const roleLabel = role === 'HOUSEMAN' ? 'HOUSEKEEPING' : role; // Display label
-                                            const isSelected = alertConfig.targetRole === role || (!alertConfig.targetRole && (
-                                                (alertConfig.type === 'BROKEN' && role === 'MAINTENANCE') ||
-                                                (alertConfig.type === 'MISSING' && role === 'HOUSEMAN')
-                                            ));
-
-                                            // Determine if this role is currently "active" for visual state
-                                            const active = alertConfig.targetRole === role || (!alertConfig.targetRole && (
-                                                (alertConfig.type === 'BROKEN' && role === 'MAINTENANCE') ||
-                                                (alertConfig.type === 'MISSING' && role === 'HOUSEMAN') ||
-                                                (alertConfig.type === 'GENERAL' && role === 'MAINTENANCE')
-                                            ));
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={role}
-                                                    style={{
-                                                        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-                                                        backgroundColor: active ? theme.colors.primary : '#F3F4F6',
-                                                        borderWidth: 1, borderColor: active ? theme.colors.primary : '#E5E7EB'
-                                                    }}
-                                                    onPress={() => setAlertConfig({ ...alertConfig, targetRole: role as IncidentRole })}
-                                                >
-                                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: active ? 'white' : '#374151' }}>
-                                                        {roleLabel}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </ScrollView>
-                                </View>
-
-                                {/* Input Area */}
-                                <View style={{ backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
-                                    <TextInput
-                                        placeholder={alertConfig.type === 'BROKEN' ? "Describe damage..." : "What's missing?"}
-                                        value={alertText}
-                                        onChangeText={setAlertText}
-                                        multiline
-                                        style={{ minHeight: 60, fontSize: 16, textAlignVertical: 'top' }}
-                                    />
-                                    {/* Smart Translation Badge */}
-                                    {alertText.length > 3 && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 8 }}>
-                                            <CheckCircle size={14} color={theme.colors.success} style={{ marginRight: 4 }} />
-                                            <Text style={{ fontSize: 12, color: theme.colors.success, fontStyle: 'italic' }}>Auto-Translate Active</Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                {/* Photo Preview / Add Button */}
-                                <View style={{ flexDirection: 'row', marginBottom: 24 }}>
-                                    {alertPhoto ? (
-                                        <View style={{ position: 'relative' }}>
-                                            <Image source={{ uri: alertPhoto }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                                    {/* Presets Grid */}
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+                                        {(alertConfig.type === 'BROKEN' ? BROKEN_PRESETS : alertConfig.type === 'MISSING' ? MISSING_PRESETS : []).map(preset => (
                                             <TouchableOpacity
-                                                style={{ position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 12 }}
-                                                onPress={() => setAlertPhoto(null)}
+                                                key={preset}
+                                                style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' }}
+                                                onPress={() => setAlertText(preset)}
                                             >
-                                                <XCircle size={20} color="red" />
+                                                <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151' }}>{preset}</Text>
                                             </TouchableOpacity>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity
-                                            style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#9CA3AF', borderRadius: 8, flex: 1, justifyContent: 'center' }}
-                                            onPress={() => pickImage(true)}
-                                        >
-                                            <Camera size={20} color="#6B7280" style={{ marginRight: 8 }} />
-                                            <Text style={{ color: '#6B7280' }}>Add Photo Evidence</Text>
-                                        </TouchableOpacity>
-                                    )}
+                                        ))}
+                                    </View>
+
+                                    {/* Role Selector */}
+                                    <View style={{ marginBottom: 16 }}>
+                                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase' }}>Assign To:</Text>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                            {(['MAINTENANCE', 'HOUSEMAN', 'RECEPTION', 'SUPERVISOR'] as const).map(role => {
+                                                const roleLabel = role === 'HOUSEMAN' ? 'HOUSEKEEPING' : role; // Display label
+                                                const isSelected = alertConfig.targetRole === role || (!alertConfig.targetRole && (
+                                                    (alertConfig.type === 'BROKEN' && role === 'MAINTENANCE') ||
+                                                    (alertConfig.type === 'MISSING' && role === 'HOUSEMAN')
+                                                ));
+
+                                                // Determine if this role is currently "active" for visual state
+                                                const active = alertConfig.targetRole === role || (!alertConfig.targetRole && (
+                                                    (alertConfig.type === 'BROKEN' && role === 'MAINTENANCE') ||
+                                                    (alertConfig.type === 'MISSING' && role === 'HOUSEMAN') ||
+                                                    (alertConfig.type === 'GENERAL' && role === 'MAINTENANCE')
+                                                ));
+
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={role}
+                                                        style={{
+                                                            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+                                                            backgroundColor: active ? theme.colors.primary : '#F3F4F6',
+                                                            borderWidth: 1, borderColor: active ? theme.colors.primary : '#E5E7EB'
+                                                        }}
+                                                        onPress={() => setAlertConfig({ ...alertConfig, targetRole: role as IncidentRole })}
+                                                    >
+                                                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: active ? 'white' : '#374151' }}>
+                                                            {roleLabel}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </ScrollView>
+                                    </View>
+
+                                    {/* Input Area */}
+                                    <View style={{ backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                                        <TextInput
+                                            placeholder={alertConfig.type === 'BROKEN' ? "Describe damage..." : "What's missing?"}
+                                            value={alertText}
+                                            onChangeText={setAlertText}
+                                            multiline
+                                            style={{ minHeight: 60, fontSize: 16, textAlignVertical: 'top' }}
+                                        />
+                                        {/* Smart Translation Badge */}
+                                        {alertText.length > 3 && (
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 8 }}>
+                                                <CheckCircle size={14} color={theme.colors.success} style={{ marginRight: 4 }} />
+                                                <Text style={{ fontSize: 12, color: theme.colors.success, fontStyle: 'italic' }}>Auto-Translate Active</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* Photo Preview / Add Button */}
+                                    <View style={{ flexDirection: 'row', marginBottom: 24 }}>
+                                        {alertPhoto ? (
+                                            <View style={{ position: 'relative' }}>
+                                                <Image source={{ uri: alertPhoto }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                                                <TouchableOpacity
+                                                    style={{ position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 12 }}
+                                                    onPress={() => setAlertPhoto(null)}
+                                                >
+                                                    <XCircle size={20} color="red" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity
+                                                style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#9CA3AF', borderRadius: 8, flex: 1, justifyContent: 'center' }}
+                                                onPress={() => pickImage(true)}
+                                            >
+                                                <Camera size={20} color="#6B7280" style={{ marginRight: 8 }} />
+                                                <Text style={{ color: '#6B7280' }}>Add Photo Evidence</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+
+                                    {/* Submit Button */}
+                                    <TouchableOpacity
+                                        style={{ backgroundColor: theme.colors.primary, padding: 16, borderRadius: 12, alignItems: 'center' }}
+                                        onPress={submitFastAlert}
+                                    >
+                                        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>Send Report</Text>
+                                    </TouchableOpacity>
+
                                 </View>
-
-                                {/* Submit Button */}
-                                <TouchableOpacity
-                                    style={{ backgroundColor: theme.colors.primary, padding: 16, borderRadius: 12, alignItems: 'center' }}
-                                    onPress={submitFastAlert}
-                                >
-                                    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>Send Report</Text>
-                                </TouchableOpacity>
-
                             </View>
-                        </View>
+                        </KeyboardAvoidingView>
                     </Modal>
 
                     {/* Fixed Bottom Action Bar */}
@@ -1463,53 +1514,67 @@ export default function RoomDetailScreen() {
                     {
                         room.status !== 'COMPLETED' && (
                             <View style={styles.footerOverlay}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.actionButton,
-                                        {
-                                            backgroundColor:
-                                                room.guestStatus === 'IN_ROOM' || isBlocked ? theme.colors.border :
-                                                    (room.status === 'PENDING' ? theme.colors.primary :
-                                                        room.status === 'INSPECTION' ? theme.colors.success : // Approve
-                                                            theme.colors.info), // Finish -> Inspection
-                                            opacity: (room.guestStatus === 'IN_ROOM' || isBlocked) ? 0.8 : 1
-                                        }
-                                    ]}
-                                    onPress={handleAction}
-                                    disabled={room.guestStatus === 'IN_ROOM' || isBlocked}
-                                >
-                                    {isBlocked ? (
-                                        <>
-                                            <AlertTriangle size={24} color={theme.colors.textSecondary} />
-                                            <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Resolve Incidents First</Text>
-                                        </>
-                                    ) : room.guestStatus === 'IN_ROOM' ? (
-                                        <>
-                                            <User size={24} color={theme.colors.textSecondary} />
-                                            <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Guest In Room</Text>
-                                        </>
-                                    ) : room.status === 'PENDING' ? (
-                                        <>
-                                            <Play size={24} color="white" fill="white" />
-                                            <Text style={styles.actionButtonText}>Start Cleaning</Text>
-                                        </>
-                                    ) : room.status === 'INSPECTION' && isSupervisor ? (
-                                        <>
-                                            <CheckCircle2 size={24} color="white" />
-                                            <Text style={styles.actionButtonText}>Approve Inspection</Text>
-                                        </>
-                                    ) : room.status === 'INSPECTION' && !isSupervisor ? (
-                                        <>
-                                            <Clock size={24} color="white" />
-                                            <Text style={styles.actionButtonText}>Pending Inspection</Text>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <UserCheck size={24} color="white" />
-                                            <Text style={styles.actionButtonText}>Finish & Request Inspection</Text>
-                                        </>
-                                    )}
-                                </TouchableOpacity>
+                                {(room.status === 'PENDING' && !isBlocked && room.guestStatus !== 'GUEST_IN_ROOM') ? (
+                                    <SwipeToStart
+                                        onSwipeRight={() => {
+                                            startCleaning(room.id);
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                        }}
+                                        onSwipeLeft={() => {
+                                            navigation.goBack();
+                                        }}
+                                        rightLabel="Slide to Start"
+                                        leftLabel="Swipe Left to Postpone"
+                                    />
+                                ) : (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.actionButton,
+                                            {
+                                                backgroundColor:
+                                                    room.guestStatus === 'IN_ROOM' || isBlocked ? theme.colors.border :
+                                                        (room.status === 'PENDING' ? theme.colors.primary :
+                                                            room.status === 'INSPECTION' ? theme.colors.success : // Approve
+                                                                theme.colors.info), // Finish -> Inspection
+                                                opacity: (room.guestStatus === 'IN_ROOM' || isBlocked) ? 0.8 : 1
+                                            }
+                                        ]}
+                                        onPress={handleAction}
+                                        disabled={room.guestStatus === 'IN_ROOM' || isBlocked}
+                                    >
+                                        {isBlocked ? (
+                                            <>
+                                                <AlertTriangle size={24} color={theme.colors.textSecondary} />
+                                                <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Resolve Incidents First</Text>
+                                            </>
+                                        ) : room.guestStatus === 'IN_ROOM' ? (
+                                            <>
+                                                <User size={24} color={theme.colors.textSecondary} />
+                                                <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Guest In Room</Text>
+                                            </>
+                                        ) : room.status === 'PENDING' ? (
+                                            <>
+                                                <Play size={24} color="white" fill="white" />
+                                                <Text style={styles.actionButtonText}>Start Cleaning</Text>
+                                            </>
+                                        ) : room.status === 'INSPECTION' && isSupervisor ? (
+                                            <>
+                                                <CheckCircle2 size={24} color="white" />
+                                                <Text style={styles.actionButtonText}>Approve Inspection</Text>
+                                            </>
+                                        ) : room.status === 'INSPECTION' && !isSupervisor ? (
+                                            <>
+                                                <Clock size={24} color="white" />
+                                                <Text style={styles.actionButtonText}>Pending Inspection</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <UserCheck size={24} color="white" />
+                                                <Text style={styles.actionButtonText}>Finish & Request Inspection</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
 
                                 {room.status === 'INSPECTION' && isSupervisor && (
                                     <TouchableOpacity

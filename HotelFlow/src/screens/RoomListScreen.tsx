@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, TextInput, Alert, Modal } from 'react-native';
 import { useHotel, Room, IncidentRole, RoomStatus } from '../contexts/HotelContext';
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { RoomCard } from '../components/RoomCard';
 import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
 import { DayTimer } from '../components/DayTimer';
+import { RoomTimeline } from '../components/RoomTimeline';
 import { theme } from '../utils/theme';
-import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react-native'; // Clean icon for help
+import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle, History, XCircle } from 'lucide-react-native'; // Clean icon for help
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { SkeletonRoomCard } from '../components/SkeletonRoomCard';
@@ -35,29 +36,8 @@ const DashboardHeader = () => {
 
         switch (user.role) {
             case 'CLEANER': {
-                const assignedToMe = rooms.filter(r => r.assigned_cleaner === user.id);
-                const myRooms = rooms.filter(r => {
-                    const assignedId = String(r.assigned_cleaner);
-                    const userId = String(user.id);
-                    if (assignedId === userId) return true;
-                    if (r.assigned_cleaner) return false;
-                    return r.assignedGroup === user.groupId;
-                });
-                const completedRooms = myRooms.filter(r => r.status === 'COMPLETED').length;
-                const totalRooms = myRooms.length;
-
-                // Tasks Stats
-                const myTasks = systemIncidents.filter(i =>
-                    i.targetRole === 'CLEANER' &&
-                    i.status === 'OPEN' &&
-                    (!i.assignedTo || i.assignedTo === user.id)
-                ).length;
-
-                return [
-                    { label: 'My Rooms', value: totalRooms, icon: '🛏️' },
-                    { label: 'My Tasks', value: myTasks, icon: '📋' },
-                    { label: 'Progress', value: `${totalRooms ? Math.round((completedRooms / totalRooms) * 100) : 0}%`, icon: '📊' }
-                ];
+                // User requested to hide these stats as they are redundant with the bottom panel
+                return [];
             }
             case 'SUPERVISOR': {
                 const toInspect = rooms.filter(r => r.status === 'INSPECTION').length;
@@ -116,15 +96,17 @@ const DashboardHeader = () => {
                 </View>
             </View>
 
-            <View style={styles.statsRow}>
-                {stats.map((stat, index) => (
-                    <View key={index} style={[styles.statCard, stat.alert && styles.statCardAlert]}>
-                        <Text style={styles.statIcon}>{stat.icon}</Text>
-                        <Text style={styles.statValue}>{stat.value}</Text>
-                        <Text style={[styles.statLabel, stat.alert && styles.statLabelAlert]}>{stat.label}</Text>
-                    </View>
-                ))}
-            </View>
+            {stats.length > 0 && (
+                <View style={styles.statsRow}>
+                    {stats.map((stat, index) => (
+                        <View key={index} style={[styles.statCard, stat.alert && styles.statCardAlert]}>
+                            <Text style={styles.statIcon}>{stat.icon}</Text>
+                            <Text style={styles.statValue}>{stat.value}</Text>
+                            <Text style={[styles.statLabel, stat.alert && styles.statLabelAlert]}>{stat.label}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
         </View>
     );
 };
@@ -136,46 +118,97 @@ const CleanerActionPanel = ({ showAll, setShowAll }: { showAll: boolean, setShow
 
     if (!isCleaner) return null;
 
+    const [showHistory, setShowHistory] = useState(false);
+
     // Calculate specific user progress
     const myRooms = rooms.filter(r => r.assigned_cleaner === user.id || (user.groupId && r.assignedGroup === user.groupId && !r.assigned_cleaner));
-    const completed = myRooms.filter(r => r.status === 'COMPLETED').length;
+    const completedRoomsList = myRooms.filter(r => r.status === 'COMPLETED' || r.status === 'INSPECTION').sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
+    const completed = myRooms.filter(r => r.status === 'COMPLETED' || r.status === 'INSPECTION').length;
     const total = myRooms.length;
     const progress = total > 0 ? completed / total : 0;
 
+    const formatDuration = (seconds?: number) => {
+        if (!seconds) return '-- min';
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}m ${s}s`;
+    };
+
     return (
         <View style={styles.cleanerPanel}>
-            <View style={styles.goalRow}>
-                <View style={styles.goalInfo}>
-                    <Text style={styles.goalLabel}>Daily Goal</Text>
-                    <Text style={styles.goalValue}>{Math.round(progress * 100)}%</Text>
-                </View>
-                <View style={styles.progressBarBg}>
+            {/* Header Row with History Button */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={styles.progressLabel}>
+                    {Math.round(progress * 100)}% Complete
+                </Text>
+                <TouchableOpacity onPress={() => setShowHistory(true)} style={styles.historyBtn}>
+                    <History size={16} color={theme.colors.primary} />
+                    <Text style={styles.historyBtnText}>History</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Progress Bar */}
+            <View style={styles.progressRow}>
+                <View style={styles.progressBarContainer}>
                     <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
                 </View>
             </View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.toggleContainer}>
+            {/* Segmented Control */}
+            <View style={styles.segmentedControl}>
                 <TouchableOpacity
-                    style={[styles.toggleBtn, !showAll && styles.toggleBtnActive]}
+                    style={[styles.segmentBtn, !showAll && styles.segmentBtnActive]}
                     onPress={() => setShowAll(false)}
                 >
-                    <Text style={[styles.toggleText, !showAll && styles.toggleTextActive]}>My Assignment</Text>
+                    <Text style={[styles.segmentText, !showAll && styles.segmentTextActive]}>My Journey</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.toggleBtn, showAll && styles.toggleBtnActive]}
+                    style={[styles.segmentBtn, showAll && styles.segmentBtnActive]}
                     onPress={() => setShowAll(true)}
                 >
-                    <Text style={[styles.toggleText, showAll && styles.toggleTextActive]}>Team Rooms</Text>
+                    <Text style={[styles.segmentText, showAll && styles.segmentTextActive]}>Team Queue</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* History Modal */}
+            <Modal visible={showHistory} animationType="slide" transparent={true}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Completed Rooms</Text>
+                            <TouchableOpacity onPress={() => setShowHistory(false)}>
+                                <XCircle size={24} color={theme.colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={{ maxHeight: 400 }}>
+                            {completedRoomsList.length === 0 ? (
+                                <Text style={styles.emptyText}>No completed rooms yet.</Text>
+                            ) : (
+                                completedRoomsList.map(r => (
+                                    <View key={r.id} style={styles.historyItem}>
+                                        <View>
+                                            <Text style={styles.historyRoomNum}>Room {r.number}</Text>
+                                            <Text style={styles.historyType}>{r.cleaningType}</Text>
+                                        </View>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={styles.historyDuration}>{formatDuration(r.lastCleaningDuration)}</Text>
+                                            <Text style={styles.historyTime}>
+                                                {new Date(r.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
 
 export default function RoomListScreen() {
-    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, resolveIncident, isOffline, fetchSystemIncidents } = useHotel();
+    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, resolveIncident, isOffline, fetchSystemIncidents, updateGuestStatus } = useHotel();
     const { user, logout } = useAuth();
     const navigation = useNavigation<NavigationProp>();
 
@@ -206,23 +239,10 @@ export default function RoomListScreen() {
     const isCleaner = user?.role === 'CLEANER';
 
     const handleQuickStatusUpdate = async (room: Room) => {
-        let newStatus: RoomStatus | null = null;
-        if (room.status === 'PENDING') newStatus = 'IN_PROGRESS';
-        else if (room.status === 'IN_PROGRESS') newStatus = 'COMPLETED'; // Cleaning Done
-
-        if (newStatus) {
-            // Optimistic / Fast update
-            // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); // If haptics available
-            try {
-                await updateRoomStatus(room.id, newStatus);
-                // Trigger Confetti if completed
-                if (newStatus === 'COMPLETED') {
-                    confettiRef.current?.start();
-                }
-            } catch (error) {
-                Alert.alert("Error", "Failed to update status");
-            }
-        }
+        // User Request: "solo un boton de inicio...directo a la limpieza"
+        // Instead of updating status, we Navigate to the Detail Screen.
+        // We reuse handleRoomPress which handles blocking logic + navigation.
+        handleRoomPress(room);
     };
 
     const { announcements, fetchAnnouncements } = useHotel();
@@ -388,6 +408,12 @@ export default function RoomListScreen() {
                     // Fallback to individual assignment if solo
                     if (room.assigned_cleaner !== user?.id) return false;
                 }
+
+                // HIDE COMPLETED/INSPECTION (User Request: "sacar los cuartos que se termina de limpiar")
+                // Only show if 'Show All' toggle is active
+                if (!cleanerShowAll && (room.status === 'COMPLETED' || room.status === 'INSPECTION')) {
+                    return false;
+                }
             }
 
             // Incident Filter
@@ -440,6 +466,14 @@ export default function RoomListScreen() {
                 return scoreA - scoreB; // Lower score = Higher Priority
             }
 
+            // Tie-Breaker: Pre-Arrival Logic (Sort by Arrival Time)
+            if (a.cleaningType === 'PREARRIVAL' && b.cleaningType === 'PREARRIVAL') {
+                const timeA = a.guestDetails?.next_arrival_time || '23:59';
+                const timeB = b.guestDetails?.next_arrival_time || '23:59';
+                // Earlier time = Higher Priority (Ascending)
+                if (timeA !== timeB) return timeA.localeCompare(timeB);
+            }
+
             // Tie-Breaker: Reception Priority (Manual Overrides)
             if (a.receptionPriority !== b.receptionPriority) {
                 // Undefined priority (low) vs Defined (high)
@@ -462,35 +496,51 @@ export default function RoomListScreen() {
     const totalTimeFormatted = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 
     const handleRoomPress = (room: Room) => {
+        // User Request: Block if another room is IN_PROGRESS
+        if (isCleaner) {
+            // Find if any other room is IN_PROGRESS for this user
+            const roomInProgress = rooms.find(r =>
+                r.status === 'IN_PROGRESS' &&
+                r.id !== room.id &&
+                (r.assigned_cleaner === user?.id || (user?.groupId && r.assignedGroup === user.groupId))
+            );
+
+            if (roomInProgress) {
+                Alert.alert(
+                    "One Room at a Time",
+                    `You are currently working on Room ${roomInProgress.number}. Please finish it or pause it before starting another.`,
+                    [
+                        { text: "OK", style: "default" },
+                        {
+                            text: "Go to Active Room",
+                            onPress: () => navigation.navigate('RoomDetail', { roomId: roomInProgress.id })
+                        }
+                    ]
+                );
+                return;
+            }
+        }
+
         const isOccupied = room.guestStatus === 'GUEST_IN_ROOM' || room.guestStatus === 'DND';
 
         if (isOccupied) {
             Alert.alert(
                 "Guest in Room",
-                `Verify if guest is present in Room ${room.number}.`,
+                "Has the guest left the room?",
                 [
-                    { text: "Cancel", style: 'cancel' },
+                    { text: "No", style: 'cancel' },
                     {
-                        text: "Notify Reception",
+                        text: "Yes, Enter",
                         onPress: () => {
-                            addSystemIncident(`Room ${room.number} is BLOCKED (Guest In). Please call to verify vacancy.`, 'RECEPTION');
-                            Alert.alert("Reception Notified", "Request sent.");
-                        },
-                        style: 'default'
-                    },
-                    {
-                        text: "Guest Left (Enter)",
-                        onPress: () => {
-                            // Proceed to detail
+                            updateGuestStatus(room.id, 'GUEST_OUT');
                             navigation.navigate('RoomDetail', { roomId: room.id });
                         },
-                        style: 'destructive'
+                        style: 'destructive' // or default
                     }
                 ]
             );
             return;
         }
-
         navigation.navigate('RoomDetail', { roomId: room.id });
     };
 
@@ -570,14 +620,7 @@ export default function RoomListScreen() {
 
 
             <View style={styles.controlsContainer}>
-                <View style={styles.userInfo}>
-                    <Text style={styles.userRoleText}>
-                        {user?.role === 'SUPERVISOR' ? 'Supervisor Mode' : `${user?.name}`}
-                    </Text>
-                    <TouchableOpacity onPress={() => logout()} style={{ marginLeft: 10 }}>
-                        <LogOut size={16} color="red" />
-                    </TouchableOpacity>
-                </View>
+
 
                 {isCleaner && (
                     <>
@@ -704,36 +747,10 @@ export default function RoomListScreen() {
                 </View>
             )}
 
-            <FlatList
-                data={filteredRooms}
-                keyExtractor={item => item.id}
-                renderItem={({ item }) => {
-                    // Calculate if blocked for Visuals
-                    const isHighPriorityType = item.cleaningType === 'PREARRIVAL' || item.cleaningType === 'DEPARTURE';
-                    const isOccupied = item.guestStatus === 'GUEST_IN_ROOM' || item.guestStatus === 'DND';
-                    const isBlocked = isHighPriorityType && isOccupied;
-
-                    return (
-                        <View>
-                            {isBlocked && (
-                                <View style={styles.blockedBanner}>
-                                    <ShieldAlert size={14} color="white" />
-                                    <Text style={styles.blockedText}>BLOCKED: Guest In Room</Text>
-                                </View>
-                            )}
-                            <RoomCard
-                                room={item}
-                                onPress={() => handleRoomPress(item)}
-                                showGroup={isSupervisor}
-                                onQuickAction={isCleaner ? () => handleQuickStatusUpdate(item) : undefined}
-                                // Optional: opacity if blocked?
-                                style={isBlocked ? { opacity: 0.6 } : undefined}
-                            />
-                        </View>
-                    );
-                }}
-                contentContainerStyle={styles.listContent}
-                ListHeaderComponent={renderHeader}
+            <RoomTimeline
+                rooms={filteredRooms}
+                onPressRoom={handleRoomPress}
+                headerComponent={renderHeader()}
             />
             <NotificationsModal visible={showNotifications} onClose={() => setShowNotifications(false)} />
 
@@ -1227,5 +1244,139 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 12,
         fontWeight: 'bold'
+    },
+    cleanerPanel: {
+        backgroundColor: 'white',
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 20,
+        padding: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
+        marginBottom: 8
+    },
+    progressRow: {
+        marginBottom: 16
+    },
+    progressLabel: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.textSecondary,
+        marginBottom: 8,
+        textAlign: 'right'
+    },
+    progressBarContainer: {
+        height: 6,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 3,
+        overflow: 'hidden'
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: theme.colors.primary,
+        borderRadius: 3
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 4,
+        height: 44
+    },
+    segmentBtn: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 10
+    },
+    segmentBtnActive: {
+        backgroundColor: 'white',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2
+    },
+    segmentText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.colors.textSecondary
+    },
+    segmentTextActive: {
+        color: theme.colors.primary,
+        fontWeight: '700'
+    },
+    historyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: theme.colors.primary + '10',
+        borderRadius: 12,
+        gap: 6
+    },
+    historyBtnText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: theme.colors.primary
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 20,
+        width: '100%',
+        padding: 20,
+        ...theme.shadows.card
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text
+    },
+    historyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border
+    },
+    historyRoomNum: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: theme.colors.text
+    },
+    historyType: {
+        fontSize: 12,
+        color: theme.colors.textSecondary
+    },
+    historyDuration: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.primary
+    },
+    historyTime: {
+        fontSize: 10,
+        color: theme.colors.textSecondary
+    },
+    emptyText: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 20
     }
 });

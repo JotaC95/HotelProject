@@ -96,6 +96,8 @@ class Room(models.Model):
     # Supplies Tracker
     supplies_used = models.JSONField(default=dict, blank=True) # Stores { "Shampoo": 2, "Coffee": 1 }
     cleaning_started_at = models.DateTimeField(blank=True, null=True) # Shared Timer Timestamp
+    last_cleaning_duration = models.IntegerField(blank=True, null=True) # Duration in seconds
+    last_updated = models.DateTimeField(auto_now=True) # Automatic timestamp for any change
     is_houseman_completed = models.BooleanField(default=False) # Helper/Houseman status
 
     def __str__(self):

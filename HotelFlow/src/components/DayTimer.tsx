@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
+import Svg, { Circle, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useHotel } from '../contexts/HotelContext';
 import { theme } from '../utils/theme';
 import { AlertTriangle } from 'lucide-react-native';
@@ -84,7 +84,7 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
     };
 
     // Circular Progress settings
-    const size = 160;
+    const size = 200; // Increased from 160 for better visibility
     const strokeWidth = 12;
     const center = size / 2;
     const radius = size / 2 - strokeWidth / 2;
@@ -117,6 +117,12 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
 
                 <View style={styles.ringContainer}>
                     <Svg width={size} height={size}>
+                        <Defs>
+                            <LinearGradient id="progressGradient" x1="0" y1="0" x2="1" y2="0">
+                                <Stop offset="0" stopColor={theme.colors.primary} stopOpacity="1" />
+                                <Stop offset="1" stopColor="#60A5FA" stopOpacity="1" />
+                            </LinearGradient>
+                        </Defs>
                         {/* Background Track */}
                         <Circle
                             stroke={theme.colors.background}
@@ -124,12 +130,13 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
                             cy={center}
                             r={radius}
                             strokeWidth={strokeWidth}
+                            strokeOpacity={0.5}
                         />
                         {/* Progress Circle */}
                         {!isOvertime && (
                             <G rotation="-90" origin={`${center}, ${center}`}>
                                 <AnimatedCircle
-                                    stroke={getStrokeColor()}
+                                    stroke={progress > 0.8 ? theme.colors.warning : "url(#progressGradient)"}
                                     cx={center}
                                     cy={center}
                                     r={radius}
@@ -155,7 +162,7 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
                     {/* Center Text */}
                     <View style={styles.centerTextContainer}>
                         <Animated.View style={{ transform: [{ scale: isOvertime ? pulseAnim : 1 }] }}>
-                            <Text style={[styles.timerValue, { color: isOvertime ? theme.colors.error : theme.colors.text }]}>
+                            <Text style={[styles.timerValue, { color: isOvertime ? theme.colors.error : theme.colors.primary }]}>
                                 {isOvertime ? '+' : ''}{formatTime(absSeconds)}
                             </Text>
                             <Text style={styles.subLabel}>
@@ -234,9 +241,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     timerValue: {
-        fontSize: 32,
-        fontWeight: 'bold',
+        fontSize: 42,
+        fontWeight: '800',
         fontVariant: ['tabular-nums'],
+        letterSpacing: 1, // Clearer separation
     },
     subLabel: {
         fontSize: 12,

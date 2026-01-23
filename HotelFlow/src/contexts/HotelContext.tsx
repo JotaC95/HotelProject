@@ -140,6 +140,7 @@ export interface Room {
     lastDndTimestamp?: string;
     lastInspectionReport?: any;
     isHousemanCompleted?: boolean;
+    lastCleaningDuration?: number; // Duration in seconds of last cleaning
 }
 
 export interface HotelSettings {
@@ -353,12 +354,38 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // Optimistic Update: Set cleaningStartedAt to NOW
         const now = new Date().toISOString();
         setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: 'IN_PROGRESS', cleaningStartedAt: now } : r));
-        updateRoomStatus(roomId, 'IN_PROGRESS');
+
+        try {
+            await api.patch(`/housekeeping/rooms/${roomId}/`, {
+                status: 'IN_PROGRESS',
+                cleaning_started_at: now
+            });
+        } catch (e) {
+            console.error("Failed to start cleaning timer", e);
+            fetchRooms(); // Revert
+        }
     };
 
     const stopCleaning = async (roomId: string) => {
-        // No local timer cleanup needed anymore
-        // Status update handled by caller
+        const room = rooms.find(r => r.id === roomId);
+        if (room?.cleaningStartedAt) {
+            const start = new Date(room.cleaningStartedAt).getTime();
+            const now = Date.now();
+            const duration = Math.floor((now - start) / 1000); // Seconds
+
+            // Optimistic Update
+            setRooms(prev => prev.map(r => r.id === roomId ? { ...r, lastCleaningDuration: duration, cleaningStartedAt: undefined } : r));
+
+            // Send to backend (Fire & Forget)
+            try {
+                await api.patch(`/housekeeping/rooms/${roomId}/`, {
+                    last_cleaning_duration: duration,
+                    cleaning_started_at: null
+                });
+            } catch (e) {
+                console.warn("Failed to save cleaning duration", e);
+            }
+        }
     };
 
     const saveDraft = (roomId: string, data: { notes: string, incident: string }) => {
@@ -496,6 +523,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     extras: r.extras_text ? r.extras_text.split(',') : []
                 },
                 cleaningStartedAt: r.cleaning_started_at,
+                lastCleaningDuration: r.last_cleaning_duration, // Mapped from backend
                 lastInspection: r.last_inspection_report,
                 isHousemanCompleted: r.is_houseman_completed || false
             }));

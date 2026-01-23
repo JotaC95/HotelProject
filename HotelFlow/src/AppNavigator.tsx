@@ -7,6 +7,7 @@ import { useAuth } from './contexts/AuthContext';
 import { BedDouble, Settings, LogOut } from 'lucide-react-native';
 import { theme } from './utils/theme';
 import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Placeholder Screens (We will implement them properly later)
 import LoginScreen from './screens/LoginScreen';
@@ -70,6 +71,7 @@ import SettingsScreen from './screens/SettingsScreen';
 
 function MainNavigator() {
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
     // const isSupervisor = user?.role === 'SUPERVISOR'; // If needed for conditional tabs
 
     return (
@@ -84,7 +86,8 @@ function MainNavigator() {
                     shadowOffset: { width: 0, height: -2 },
                     shadowOpacity: 0.05,
                     shadowRadius: 10,
-                    height: 85,
+                    height: 65 + insets.bottom, // Dynamic height for Safe Area
+                    paddingBottom: insets.bottom, // Push content up
                     paddingTop: 10,
                 },
                 tabBarActiveTintColor: theme.colors.primary,

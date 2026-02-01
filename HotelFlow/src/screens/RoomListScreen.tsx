@@ -1245,70 +1245,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold'
     },
-    cleanerPanel: {
-        backgroundColor: 'white',
-        marginHorizontal: 16,
-        marginTop: 16,
-        borderRadius: 20,
-        padding: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 5,
-        marginBottom: 8
-    },
-    progressRow: {
-        marginBottom: 16
-    },
-    progressLabel: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: theme.colors.textSecondary,
-        marginBottom: 8,
-        textAlign: 'right'
-    },
-    progressBarContainer: {
-        height: 6,
-        backgroundColor: '#F3F4F6',
-        borderRadius: 3,
-        overflow: 'hidden'
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: theme.colors.primary,
-        borderRadius: 3
-    },
-    segmentedControl: {
-        flexDirection: 'row',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 12,
-        padding: 4,
-        height: 44
-    },
-    segmentBtn: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 10
-    },
-    segmentBtnActive: {
-        backgroundColor: 'white',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2
-    },
-    segmentText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: theme.colors.textSecondary
-    },
-    segmentTextActive: {
-        color: theme.colors.primary,
-        fontWeight: '700'
-    },
+
     historyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1378,5 +1315,21 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
         textAlign: 'center',
         marginTop: 20
+    },
+    // Restored styles that were missing
+    progressRow: {
+        marginBottom: 16
+    },
+    progressBarContainer: {
+        height: 6,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 3,
+        overflow: 'hidden'
+    },
+    segmentBtn: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 10
     }
 });

@@ -1,77 +1,135 @@
-# HotelFlow u HotelProyect
+# HotelFlow / HotelProject
 
-Aplicación móvil para gestión hotelera desarrollada con React Native y Django REST Framework.
+A comprehensive mobile application for hotel housekeeping and management, developed with **React Native** (Frontend) and **Django REST Framework** (Backend).
 
-## Requisitos Previos
+## Features
 
-- Node.js y npm instalados
-- Python 3.x instalado
-- Expo CLI
-- Dispositivo móvil con Expo Go o emulador configurado
+-   **Role-Based Access Control**: Tailored interfaces for Administrators, Supervisors, Receptionists, and Housekeeping staff.
+-   **Room Management**: Real-time tracking of room status (Clean, Dirty, Inspect, etc.), availability, and guest status.
+-   **Housekeeping Operations**:
+    -   Automated and manual task assignments.
+    -   Roster management.
+    -   Cleaning schedules and priorities (Pre-arrival, Departure, Stay-over).
+-   **Analytics Dashboard**: Visual insights into hotel performance and housekeeping efficiency.
+-   **Lost & Found**: Log and track lost items.
+-   **Maintenance**: Report and monitor maintenance requests.
+-   **Timeline View**: Visual representation of room bookings and status changes.
 
-## Instalación y Configuración
+## Technology Stack
 
-### Frontend (React Native + Expo)
+-   **Frontend**: React Native, Expo, TypeScript, React Navigation, Lucide Icons, Axios.
+-   **Backend**: Django, Django REST Framework (DRF), Python.
+-   **Database**: SQLite (Default for development).
 
-1. Navegar a la carpeta del frontend
-   cd HotelFlow
+## Prerequisites
 
-2. Instalar dependencias
-   npm install
+-   **Node.js** and **npm** installed.
+-   **Python 3.x** installed.
+-   **Expo CLI**: Install globally via `npm install -g expo-cli`.
+-   **Expo Go** app on your mobile device (iOS/Android) or a configured emulator (Android Studio / Xcode).
 
-3. Iniciar el servidor de desarrollo
-   npx expo start
-   
-   Nota: Por defecto, Expo funciona en la misma red local. Si necesitas conectarte desde una red diferente, utiliza el modo túnel:
-   npx expo start --tunnel
+## Installation & Setup
 
-4. Ejecutar la aplicación
-   - Escanea el código QR con la app Expo Go (iOS/Android)
-   - O presiona 'a' para Android o 'i' para iOS si tienes emuladores configurados
+### 1. Frontend (HotelFlow)
 
-### Backend (Django REST Framework)
+1.  Navigate to the frontend directory:
+    ```bash
+    cd HotelFlow
+    ```
 
-El backend ya está configurado y no requiere modificaciones para el funcionamiento básico.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
 
-Si necesitas ejecutar el backend localmente:
+3.  Start the development server:
+    ```bash
+    npx expo start
+    ```
+    *Note: If you need to connect from a different network or experience connection issues, use tunnel mode:*
+    ```bash
+    npx expo start --tunnel
+    ```
 
-1. Navegar a la carpeta del backend
-   cd HotelBackend
+4.  Run the application:
+    -   Scan the QR code with the **Expo Go** app.
+    -   Press `a` to run on Android Emulator or `i` for iOS Simulator.
 
-2. Crear y activar entorno virtual
-   python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
+### 2. Backend (HotelBackend)
 
-3. Instalar dependencias
-   pip install django djangorestframework
+1.  Navigate to the backend directory:
+    ```bash
+    cd HotelBackend
+    ```
 
-4. Iniciar el servidor
-   python manage.py runserver
+2.  Create and activate a virtual environment:
+    ```bash
+    # Create venv
+    python -m venv venv
 
-## Credenciales de Acceso
+    # Activate venv
+    # On macOS/Linux:
+    source venv/bin/activate
+    # On Windows:
+    venv\Scripts\activate
+    ```
 
-Usuario por defecto:
-- Usuario: admin
-- Contraseña: hotel123
+3.  Install Python dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-Para crear usuarios adicionales, accede al panel de administración de Django en:
-http://localhost:8000/admin
+4.  Apply database migrations:
+    ```bash
+    python manage.py migrate
+    ```
 
-## Uso de la Aplicación
+5.  Start the server:
+    ```bash
+    python manage.py runserver
+    ```
+    The API will be available at `http://localhost:8000/`.
 
-1. Abre la app en tu dispositivo móvil
-2. Inicia sesión con las credenciales proporcionadas
-3. Explora las funcionalidades de gestión hotelera
+## Access Credentials
 
-## Tecnologías
+### Default Admin
+-   **Username**: `admin`
+-   **Password**: `hotel123`
+    *Note: If this user does not exist, create one using:*
+    ```bash
+    python manage.py createsuperuser
+    ```
 
-- Frontend: React Native, Expo
-- Backend: Django, Django REST Framework
-- Base de datos: SQLite (desarrollo)
+### Sample Staff User
+-   **Username**: `Ramiro`
+-   **Password**: `password123`
 
-## Notas Adicionales
+To manage users and data directly, access the Django Admin Panel at:
+[http://localhost:8000/admin](http://localhost:8000/admin)
 
-- Asegúrate de que el backend esté ejecutándose antes de usar la aplicación móvil
-- Verifica que ambos dispositivos (servidor y móvil) estén en la misma red WiFi
-- Si experimentas problemas de conexión, intenta usar el modo túnel de Expo
+## Development & Testing
 
+### Populating Test Data
+To generate sample data (rooms, status, cleaning types) for testing purposes, you can run the provided script:
+
+```bash
+cd HotelBackend
+python populate_rooms_v2.py
+```
+This script clears existing rooms and creates 62 rooms with various statuses and cleaning priorities.
+
+### Directory Structure
+
+-   `HotelFlow/`: React Native frontend source code.
+    -   `src/screens/`: Application screens (Admin, Login, RoomList, etc.).
+    -   `src/components/`: Reusable UI components.
+    -   `src/services/`: API integration logic.
+-   `HotelBackend/`: Django backend source code.
+    -   `accounts/`: User authentication and role management.
+    -   `housekeeping/`: Core logic for rooms, tasks, and assignments.
+    -   `hotel_backend/`: Main project settings and configuration.
+
+## Troubleshooting
+
+-   **Network Issues**: Ensure both your computer and mobile device are on the same WiFi network. If problems persist, use `npx expo start --tunnel`.
+-   **Backend Connection**: Verify the backend is running on port 8000.

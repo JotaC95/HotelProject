@@ -1,4 +1,4 @@
-# HotelFlow / HotelProject
+# HotelProject
 
 A comprehensive mobile application for hotel housekeeping and management, developed with **React Native** (Frontend) and **Django REST Framework** (Backend).
 

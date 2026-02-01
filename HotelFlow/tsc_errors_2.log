@@ -1,0 +1,7 @@
+src/screens/RoomListScreen.tsx(1248,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1264,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1277,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1282,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1295,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1303,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1308,5): error TS1117: An object literal cannot have multiple properties with the same name.

@@ -1,0 +1,17 @@
+src/features/room-details/hooks/useIncidentActions.ts(4,58): error TS2307: Cannot find module '../../../../contexts/HotelContext' or its corresponding type declarations.
+src/features/room-details/hooks/useIncidentActions.ts(5,26): error TS2307: Cannot find module '../../../../contexts/ToastContext' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomHardware.ts(5,37): error TS2307: Cannot find module '../../../../utils/SafeNfc' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomHardware.ts(6,26): error TS2307: Cannot find module '../../../../contexts/ToastContext' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomHardware.ts(7,22): error TS2307: Cannot find module '../../../../contexts/HotelContext' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomLogic.ts(3,32): error TS2307: Cannot find module '../../../../contexts/HotelContext' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomLogic.ts(4,26): error TS2307: Cannot find module '../../../../contexts/ToastContext' or its corresponding type declarations.
+src/features/room-details/hooks/useRoomLogic.ts(10,29): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/screens/RoomDetailScreen.tsx(127,90): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/screens/RoomListScreen.tsx(1248,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1264,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1277,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1282,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1295,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1303,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/screens/RoomListScreen.tsx(1308,5): error TS1117: An object literal cannot have multiple properties with the same name.

@@ -43,16 +43,26 @@ Si necesitas ejecutar el backend localmente:
    source venv/bin/activate  # En Windows: venv\Scripts\activate
 
 3. Instalar dependencias
-   pip install django djangorestframework
+   pip install -r requirements.txt
 
-4. Iniciar el servidor
+4. Configurar base de datos y datos iniciales
+   python manage.py migrate
+   python populate_rooms_v2.py
+
+5. Iniciar el servidor
    python manage.py runserver
 
 ## Credenciales de Acceso
 
-Usuario por defecto:
+Usuarios por defecto:
+
+Administrador:
 - Usuario: admin
 - Contraseña: hotel123
+
+Personal (Staff):
+- Usuario: Ramiro
+- Contraseña: password123
 
 Para crear usuarios adicionales, accede al panel de administración de Django en:
 http://localhost:8000/admin

@@ -142,6 +142,7 @@ export const useRoomLogic = (roomId: string, navigation: any) => { // Adding nav
             toggleExtraTime: () => room && toggleExtraTime(room.id),
             toggleGuestWaiting: (val: boolean) => room && useHotel().toggleGuestWaiting(room.id, val), // Accessing directly if not destructured
             startCleaning: () => room && startCleaning(room.id),
+            updateSupplies: (supplies: any) => room && updateSupplies(room.id, supplies),
         }
     };
 };

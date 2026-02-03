@@ -40,7 +40,7 @@ export default function RoomDetailScreen() {
     if (!room) return <View><Text>Room not found</Text></View>;
 
     // Role Logic
-    const isCleanerZen = user?.role === 'CLEANER' && room.status === 'IN_PROGRESS';
+    const isCleanerZen = user?.role === 'CLEANER' && ['PENDING', 'IN_PROGRESS'].includes(room.status);
     const isSupervisorAudit = user?.role === 'SUPERVISOR' && room.status === 'INSPECTION';
 
     // Supervisor Reject Logic (Orchestrator-level to avoid polluting generic hook)
@@ -106,6 +106,8 @@ export default function RoomDetailScreen() {
                     setAlertPhoto={incidentActions.setAlertPhoto}
                     submitFastAlert={incidentActions.submitFastAlert}
                     pickImage={() => pickImage((uri) => incidentActions.setAlertPhoto(uri))}
+                    onUpdateSupplies={actions.updateSupplies}
+                    onStartCleaning={actions.startCleaning}
                 />
             ) : (
                 <StandardDetailView

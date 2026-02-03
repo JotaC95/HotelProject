@@ -27,52 +27,72 @@ interface ZenModePanelProps {
     setAlertPhoto: (uri: string | null) => void;
     submitFastAlert: () => void;
     pickImage: () => void;
+    onUpdateSupplies: (supplies: any) => void;
+    onStartCleaning?: () => void;
 }
 
 export const ZenModePanel = ({
     room, user, notes, setNotes, onSaveNotes, onGuestAction, onAddIncident, onAction,
-    onStartScan, isNfcSupported,
+    onStartScan, isNfcSupported, onUpdateSupplies, onStartCleaning,
     alertConfig, setAlertConfig, alertText, setAlertText, alertPhoto, setAlertPhoto, submitFastAlert, pickImage
 }: ZenModePanelProps) => {
 
     const [localSupplies, setLocalSupplies] = useState(room.supplies_used || {});
+    const isPending = room.status === 'PENDING';
 
-    // Note: Supply syncing logic is kept in the parent hook or useEffect for now, but UI state is here.
-    // Ideally parent handles the sync trigger.
+    // Sync state when room changes (navigation), but not on every poll to avoid overwrite
+    React.useEffect(() => {
+        if (room?.supplies_used && Object.keys(localSupplies).length === 0) {
+            setLocalSupplies(room.supplies_used);
+        }
+    }, [room?.id]);
+
+    // Debounced Save Effect
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            // Only save if different (and not empty initial)
+            if (room && JSON.stringify(localSupplies) !== JSON.stringify(room.supplies_used)) {
+                onUpdateSupplies(localSupplies);
+            }
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [localSupplies]);
 
     return (
         <View style={styles.zenContainer}>
-            {/* Guest & Supply Actions */}
-            <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', gap: 10 }}>
-                {room.guestStatus === 'GUEST_IN_ROOM' ? (
-                    <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#E0F2FE', flex: 1, borderColor: '#7DD3FC' }]} onPress={() => onGuestAction('LEFT')}>
-                        <UserCheck size={20} color="#0284C7" />
-                        <Text style={[styles.zenFastBtnText, { color: '#0284C7' }]}>Guest Left?</Text>
-                    </TouchableOpacity>
-                ) : room.guestStatus !== 'DND' && (
-                    <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#FEF9C3', flex: 1, borderColor: '#FDE047' }]} onPress={() => onGuestAction('IN')}>
-                        <UserCheck size={20} color="#CA8A04" />
-                        <Text style={[styles.zenFastBtnText, { color: '#CA8A04' }]}>Guest Is In</Text>
-                    </TouchableOpacity>
-                )}
+            {/* Guest & Supply Actions (Hidden in PENDING) */}
+            {!isPending && (
+                <View style={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', gap: 10 }}>
+                    {room.guestStatus === 'GUEST_IN_ROOM' ? (
+                        <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#E0F2FE', flex: 1, borderColor: '#7DD3FC' }]} onPress={() => onGuestAction('LEFT')}>
+                            <UserCheck size={20} color="#0284C7" />
+                            <Text style={[styles.zenFastBtnText, { color: '#0284C7' }]}>Guest Left?</Text>
+                        </TouchableOpacity>
+                    ) : room.guestStatus !== 'DND' && (
+                        <TouchableOpacity style={[styles.zenFastBtn, { backgroundColor: '#FEF9C3', flex: 1, borderColor: '#FDE047' }]} onPress={() => onGuestAction('IN')}>
+                            <UserCheck size={20} color="#CA8A04" />
+                            <Text style={[styles.zenFastBtnText, { color: '#CA8A04' }]}>Guest Is In</Text>
+                        </TouchableOpacity>
+                    )}
 
-                <TouchableOpacity
-                    style={[styles.zenFastBtn, { backgroundColor: '#F3E8FF', flex: 1, borderColor: '#D8B4FE' }]}
-                    onPress={() => {
-                        Alert.alert("Request Linen", "Notify Houseman?", [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                                text: "Request", onPress: () => {
-                                    onAddIncident('Linen Kits Missing', 'HOUSEMAN', 'SUPPLY');
+                    <TouchableOpacity
+                        style={[styles.zenFastBtn, { backgroundColor: '#F3E8FF', flex: 1, borderColor: '#D8B4FE' }]}
+                        onPress={() => {
+                            Alert.alert("Request Linen", "Notify Houseman?", [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                    text: "Request", onPress: () => {
+                                        onAddIncident('Linen Kits Missing', 'HOUSEMAN', 'SUPPLY');
+                                    }
                                 }
-                            }
-                        ]);
-                    }}
-                >
-                    <Package size={20} color="#9333EA" />
-                    <Text style={[styles.zenFastBtnText, { color: '#9333EA' }]}>Need Linen</Text>
-                </TouchableOpacity>
-            </View>
+                            ]);
+                        }}
+                    >
+                        <Package size={20} color="#9333EA" />
+                        <Text style={[styles.zenFastBtnText, { color: '#9333EA' }]}>Need Linen</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Live Timer Header */}
             <View style={styles.zenHeader}>
@@ -89,7 +109,11 @@ export const ZenModePanel = ({
                         </TouchableOpacity>
                     )}
                     <Clock size={20} color="white" style={{ marginRight: 6 }} />
-                    <Stopwatch startTime={room.cleaningStartedAt} />
+                    {isPending ? (
+                        <Text style={{ color: 'white', fontWeight: 'bold' }}>NOT STARTED</Text>
+                    ) : (
+                        <Stopwatch startTime={room.cleaningStartedAt} />
+                    )}
                 </View>
             </View>
 
@@ -146,69 +170,141 @@ export const ZenModePanel = ({
                     </View>
                 </View>
 
-                {/* Cleaner Notes */}
+                {/* Houseman Status (Restored) */}
                 <View style={styles.zenSection}>
-                    <Text style={styles.zenSectionTitle}>My Notes</Text>
-                    <TextInput
-                        style={styles.zenNotesInput}
-                        placeholder="Add notes about this room..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        value={notes}
-                        onChangeText={setNotes}
-                        onBlur={onSaveNotes}
-                    />
-                </View>
-
-                {/* Fast Alert Toolbar */}
-                <View style={styles.zenSection}>
-                    <Text style={styles.zenSectionTitle}>Fast Alert</Text>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                        <TouchableOpacity
-                            style={[styles.zenFastBtn, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}
-                            onPress={() => pickImage()}
-                        >
-                            <Camera size={24} color="#4F46E5" />
-                            <Text style={[styles.zenFastBtnText, { color: '#4F46E5' }]}>Photo</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.zenFastBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
-                            onPress={() => setAlertConfig({ visible: true, type: 'BROKEN' })}
-                        >
-                            <Wrench size={24} color="#DC2626" />
-                            <Text style={[styles.zenFastBtnText, { color: '#DC2626' }]}>Broken</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.zenFastBtn, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}
-                            onPress={() => setAlertConfig({ visible: true, type: 'MISSING' })}
-                        >
-                            <Package size={24} color="#EA580C" />
-                            <Text style={[styles.zenFastBtnText, { color: '#EA580C' }]}>Missing</Text>
-                        </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.zenSectionTitle}>Houseman Status</Text>
+                        {room.isHousemanCompleted ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                                <CheckCircle size={16} color="#059669" style={{ marginRight: 6 }} />
+                                <Text style={{ color: '#059669', fontWeight: 'bold', fontSize: 13 }}>READY</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#FCD34D' }}
+                                onPress={() => {
+                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                                    onAddIncident("Houseman Prep Request", "HOUSEMAN", 'GUEST_REQ');
+                                    // showToast("Houseman Requested!", "SUCCESS"); // Toast managed by parent/hook usually, but hook just adds incident.
+                                }}
+                            >
+                                <AlertTriangle size={16} color="#D97706" style={{ marginRight: 6 }} />
+                                <Text style={{ color: "#D97706", fontWeight: 'bold', fontSize: 13 }}>REQUEST PREP</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
-                {/* Quick Incidents */}
-                <View style={styles.zenSection}>
-                    <Text style={styles.zenSectionTitle}>Quick Report</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                        {INCIDENT_PRESETS.map((preset) => (
-                            <TouchableOpacity
-                                key={preset}
-                                style={styles.zenChip}
-                                onPress={() => {
-                                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                    onAddIncident(preset, 'MAINTENANCE', undefined);
-                                }}
-                            >
-                                <AlertTriangle size={14} color={theme.colors.error} />
-                                <Text style={styles.zenChipText}>{preset}</Text>
-                            </TouchableOpacity>
+                {/* Open Incidents Warning (Restored) */}
+                {room.incidents.some(i => i.status === 'OPEN') && (
+                    <View style={[styles.zenSection, { borderColor: theme.colors.warning, borderWidth: 1 }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                            <AlertTriangle size={20} color={theme.colors.warning} style={{ marginRight: 8 }} />
+                            <Text style={[styles.zenSectionTitle, { marginBottom: 0 }]}>Open Incidents</Text>
+                        </View>
+                        {room.incidents.filter(i => i.status === 'OPEN').map((inc, i) => (
+                            <Text key={i} style={{ fontSize: 14, color: theme.colors.text, marginBottom: 4 }}>• {inc.text}</Text>
                         ))}
-                    </ScrollView>
-                </View>
+                    </View>
+                )}
+
+                {/* Only show these interactions if NOT pending */}
+                {!isPending && (
+                    <>
+                        {/* Cleaner Notes */}
+                        <View style={styles.zenSection}>
+                            <Text style={styles.zenSectionTitle}>My Notes</Text>
+                            <TextInput
+                                style={styles.zenNotesInput}
+                                placeholder="Add notes about this room..."
+                                placeholderTextColor="#9CA3AF"
+                                multiline
+                                value={notes}
+                                onChangeText={setNotes}
+                                onBlur={onSaveNotes}
+                            />
+                        </View>
+
+                        {/* Fast Alert Toolbar */}
+                        <View style={styles.zenSection}>
+                            <Text style={styles.zenSectionTitle}>Fast Alert</Text>
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <TouchableOpacity
+                                    style={[styles.zenFastBtn, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}
+                                    onPress={() => pickImage()}
+                                >
+                                    <Camera size={24} color="#4F46E5" />
+                                    <Text style={[styles.zenFastBtnText, { color: '#4F46E5' }]}>Photo</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.zenFastBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                                    onPress={() => setAlertConfig({ visible: true, type: 'BROKEN' })}
+                                >
+                                    <Wrench size={24} color="#DC2626" />
+                                    <Text style={[styles.zenFastBtnText, { color: '#DC2626' }]}>Broken</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.zenFastBtn, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}
+                                    onPress={() => setAlertConfig({ visible: true, type: 'MISSING' })}
+                                >
+                                    <Package size={24} color="#EA580C" />
+                                    <Text style={[styles.zenFastBtnText, { color: '#EA580C' }]}>Missing</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Quick Incidents */}
+                        <View style={styles.zenSection}>
+                            <Text style={styles.zenSectionTitle}>Quick Report</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                                {INCIDENT_PRESETS.map((preset) => (
+                                    <TouchableOpacity
+                                        key={preset}
+                                        style={styles.zenChip}
+                                        onPress={() => {
+                                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                            onAddIncident(preset, 'MAINTENANCE', undefined);
+                                        }}
+                                    >
+                                        <AlertTriangle size={14} color={theme.colors.error} />
+                                        <Text style={styles.zenChipText}>{preset}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Linen & Towels Used */}
+                        <View style={styles.zenSection}>
+                            <Text style={styles.zenSectionTitle}>Linen & Towels Used</Text>
+                            <View style={styles.suppliesGrid}>
+                                {['Large Towel', 'Hand Towel', 'Face Towel', 'Bath Mat'].map(item => (
+                                    <View key={item} style={styles.supplyItem}>
+                                        <Text style={styles.supplyLabel}>{item}</Text>
+                                        <View style={styles.counterRow}>
+                                            <TouchableOpacity
+                                                style={styles.counterBtn}
+                                                onPress={() => setLocalSupplies(prev => ({ ...prev, [item]: Math.max(0, (prev[item] || 0) - 1) }))}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <Text style={styles.counterBtnText}>-</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.counterValue}>{localSupplies[item] || 0}</Text>
+                                            <TouchableOpacity
+                                                style={styles.counterBtn}
+                                                onPress={() => setLocalSupplies(prev => ({ ...prev, [item]: (prev[item] || 0) + 1 }))}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <Text style={styles.counterBtnText}>+</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    </>
+                )}
 
             </ScrollView>
 
@@ -228,10 +324,17 @@ export const ZenModePanel = ({
 
             {/* Fixed Bottom Action Bar */}
             <View style={styles.zenFooter}>
-                <TouchableOpacity style={styles.zenFinishButton} onPress={onAction}>
-                    <CheckCircle size={24} color="white" fill={theme.colors.primary} />
-                    <Text style={styles.zenFinishText}>Complete Room</Text>
-                </TouchableOpacity>
+                {isPending ? (
+                    <TouchableOpacity style={[styles.zenFinishButton, { backgroundColor: '#10B981' }]} onPress={onStartCleaning}>
+                        <CheckCircle size={24} color="white" fill='#10B981' />
+                        <Text style={styles.zenFinishText}>Start Cleaning</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity style={styles.zenFinishButton} onPress={onAction}>
+                        <CheckCircle size={24} color="white" fill={theme.colors.primary} />
+                        <Text style={styles.zenFinishText}>Complete Room</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -399,4 +502,51 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 10,
     },
+    suppliesGrid: {
+        gap: 12
+    },
+    supplyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border
+    },
+    supplyLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: theme.colors.text
+    },
+    counterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15
+    },
+    counterBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        ...theme.shadows.card
+    },
+    counterBtnText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+        marginTop: -2
+    },
+    counterValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+        minWidth: 20,
+        textAlign: 'center'
+    }
 });

@@ -8,9 +8,10 @@ interface RoomTimelineProps {
     rooms: Room[];
     onPressRoom: (room: Room) => void;
     headerComponent?: React.ReactNode;
+    emptyComponent?: React.ReactNode;
 }
 
-export const RoomTimeline = ({ rooms, onPressRoom, headerComponent }: RoomTimelineProps) => {
+export const RoomTimeline = ({ rooms, onPressRoom, headerComponent, emptyComponent }: RoomTimelineProps) => {
     // Sort logic should ideally be passed in, but assuming sorted 'rooms'.
     // We visualize them as a path.
 
@@ -18,11 +19,13 @@ export const RoomTimeline = ({ rooms, onPressRoom, headerComponent }: RoomTimeli
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {headerComponent}
             {rooms.length === 0 && (
-                <View style={styles.emptyContainer}>
-                    <CheckCircle size={48} color={theme.colors.success} />
-                    <Text style={styles.emptyText}>All Caught Up!</Text>
-                    <Text style={styles.emptySubText}>No rooms in your queue.</Text>
-                </View>
+                emptyComponent ? emptyComponent : (
+                    <View style={styles.emptyContainer}>
+                        <CheckCircle size={48} color={theme.colors.success} />
+                        <Text style={styles.emptyText}>All Caught Up!</Text>
+                        <Text style={styles.emptySubText}>No rooms in your queue.</Text>
+                    </View>
+                )
             )}
 
             {rooms.map((room, index) => {

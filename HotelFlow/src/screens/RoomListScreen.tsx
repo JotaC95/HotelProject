@@ -7,10 +7,11 @@ import { SupervisorTeamDashboard } from '../components/SupervisorTeamDashboard';
 import { DayTimer } from '../components/DayTimer';
 import { RoomTimeline } from '../components/RoomTimeline';
 import { theme } from '../utils/theme';
-import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle, History, XCircle } from 'lucide-react-native'; // Clean icon for help
+import { Search, Filter, HandHelping, Bell, Package, BarChart, Briefcase, ShieldAlert, LogOut, WifiOff, AlertTriangle, CheckCircle, History, XCircle, BedDouble, Sparkles } from 'lucide-react-native'; // Clean icon for help
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { SkeletonRoomCard } from '../components/SkeletonRoomCard';
+import { EmptyState } from '../components/EmptyState';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -208,7 +209,7 @@ const CleanerActionPanel = ({ showAll, setShowAll }: { showAll: boolean, setShow
 };
 
 export default function RoomListScreen() {
-    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, resolveIncident, isOffline, fetchSystemIncidents, updateGuestStatus } = useHotel();
+    const { rooms, settings, session, systemIncidents, addSystemIncident, completeSession, updateRoomStatus, resolveIncident, isOffline, fetchSystemIncidents, updateGuestStatus, isLoading } = useHotel();
     const { user, logout } = useAuth();
     const navigation = useNavigation<NavigationProp>();
 
@@ -675,9 +676,9 @@ export default function RoomListScreen() {
         </View>
     );
 
-    const isLoading = rooms.length === 0; // Simple check, or add proper loading state context
+    // const isLoading = rooms.length === 0; // REPLACED WITH CONTEXT STATE
 
-    if (isLoading) {
+    if (isLoading && rooms.length === 0) { // Only show full screen loading if no rooms loaded yet
         return (
             <SafeAreaView style={styles.container} edges={['top']}>
                 <View style={[styles.headerContainer, { paddingHorizontal: 16 }]}>
@@ -751,6 +752,15 @@ export default function RoomListScreen() {
                 rooms={filteredRooms}
                 onPressRoom={handleRoomPress}
                 headerComponent={renderHeader()}
+                emptyComponent={
+                    <EmptyState
+                        icon={filteredRooms.length === 0 && rooms.length > 0 ? Search : BedDouble}
+                        title={filteredRooms.length === 0 && rooms.length > 0 ? "No Matches Found" : "All Rooms Ready!"}
+                        message={filteredRooms.length === 0 && rooms.length > 0 ? "Try adjusting your filters or search terms." : "There are no rooms assigned to you right now. Enjoy your break!"}
+                        actionLabel={filteredRooms.length === 0 && rooms.length > 0 ? "Clear Filters" : undefined}
+                        onAction={filteredRooms.length === 0 && rooms.length > 0 ? () => { setSearchQuery(''); setSelectedGroup('ALL'); } : undefined}
+                    />
+                }
             />
             <NotificationsModal visible={showNotifications} onClose={() => setShowNotifications(false)} />
 

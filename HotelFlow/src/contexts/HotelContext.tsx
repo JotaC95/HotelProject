@@ -281,6 +281,7 @@ interface HotelContextType {
     startCleaning: (roomId: string) => Promise<void>;
     stopCleaning: (roomId: string) => Promise<void>;
     saveDraft: (roomId: string, data: { notes: string, incident: string }) => void;
+    isLoading: boolean;
 }
 
 export interface CleaningTypeDefinition {
@@ -317,6 +318,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const { user } = useAuth();
     const { showToast } = useToast();
     const [rooms, setRooms] = useState<Room[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [staff, setStaff] = useState<Staff[]>([]); // Phase 23
     const [systemIncidents, setSystemIncidents] = useState<Incident[]>([]); // Phase 26
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -567,6 +569,8 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             // Load from Storage if error (Offline mode fallback)
             const cached = await storage.getRooms();
             if (cached) setRooms(cached);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -1396,10 +1400,9 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             date: new Date().toISOString(),
             totalRooms: rooms.length,
             stats: getStats(),
-            rooms: rooms,
-            logs: logs
-        }
-    }
+            rooms: rooms
+        };
+    };
 
     return (
         <HotelContext.Provider value={{
@@ -1413,24 +1416,15 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             systemIncidents, addSystemIncident, fetchSystemIncidents, fetchRooms, deleteRoom, deleteStaff, deleteGroup,
             addStaff, updateStaff,
             inventory, fetchInventory, addInventoryItem, deleteInventoryItem, updateInventoryQuantity,
-            cleaningTypes, fetchCleaningTypes, addCleaningType, deleteCleaningType, moveGuest,
-            assignRoomsDaily, updateSupplies,
-
-            // Phase 2
+            cleaningTypes, fetchCleaningTypes, addCleaningType, deleteCleaningType,
+            moveGuest, assignRoomsDaily, updateSupplies,
             lostItems, fetchLostItems, reportLostItem, updateLostItemStatus,
             announcements, fetchAnnouncements, sendAnnouncement,
             assets, fetchAssets, addAsset, updateAssetStatus,
-            fetchAnalytics,
-
-            submitInspection,
-            // Persistence Expose
-            roomDrafts,
-            startCleaning,
-            stopCleaning,
-            saveDraft,
-            isOffline,
-            isQueueProcessing,
-            queue
+            fetchAnalytics, submitInspection,
+            isOffline, isQueueProcessing, queue,
+            roomDrafts, startCleaning, stopCleaning, saveDraft,
+            isLoading
         }}>
             {children}
         </HotelContext.Provider>

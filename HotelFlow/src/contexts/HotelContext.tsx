@@ -155,7 +155,19 @@ export interface Session {
     endTime: string | null;
     isActive: boolean;
     totalMinutes: number;
+    breakMinutes: number;
 }
+
+// ... (Context definition needs update too, doing in separate chunk or merged?)
+// I will merge the Interface update and the Context Provider logic in one file update if possible, 
+// but replace_file_content is better for contiguous blocks.
+// I'll update INTERFACE first (lines 152-158)
+// Then ContextType (lines 192-215)
+// Then checkSession/startSession/takeBreak logic.
+
+// Actually, I can do it in separate calls or one multi-replace.
+// I'll use separate chunks for cleaner application.
+
 
 export const INCIDENT_PRESETS = [
     "Broken Light", "Leaking Tap", "Stained Sheets",
@@ -197,6 +209,7 @@ interface HotelContextType {
     startSession: (groupId: string) => Promise<void>;
     completeSession: () => Promise<void>;
     checkSession: () => Promise<void>;
+    takeBreak: () => Promise<void>; // New function
     updateSettings: (newSettings: HotelSettings) => void;
     updateRoomStatus: (id: string, status: RoomStatus) => void;
     toggleDND: (id: string) => void;
@@ -323,7 +336,7 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [systemIncidents, setSystemIncidents] = useState<Incident[]>([]); // Phase 26
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [settings, setSettings] = useState<HotelSettings>(DEFAULT_SETTINGS);
-    const [session, setSession] = useState<Session>({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0 });
+    const [session, setSession] = useState<Session>({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0, breakMinutes: 0 });
 
     // New Feature States
     const [lostItems, setLostItems] = useState<LostItem[]>([]);
@@ -455,10 +468,11 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     startTime: res.data.start_time,
                     endTime: null,
                     isActive: true,
-                    totalMinutes: res.data.target_duration_minutes
+                    totalMinutes: res.data.target_duration_minutes,
+                    breakMinutes: res.data.break_minutes || 0
                 });
             } else {
-                setSession({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0 });
+                setSession({ id: null, startTime: null, endTime: null, isActive: false, totalMinutes: 0, breakMinutes: 0 });
             }
         } catch (e) {
             console.error("Check session failed", e);
@@ -473,7 +487,8 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 startTime: res.data.start_time,
                 endTime: null,
                 isActive: true,
-                totalMinutes: res.data.target_duration_minutes
+                totalMinutes: res.data.target_duration_minutes,
+                breakMinutes: 0
             });
             fetchRooms(); // Refresh rooms to ensure consistent state
         } catch (e) {
@@ -491,6 +506,21 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setSession(prev => ({ ...prev, isActive: false, endTime: new Date().toISOString() }));
         } catch (e) {
             console.error("Complete session failed", e);
+        }
+    };
+
+    const takeBreak = async () => {
+        if (!session.id) return;
+        try {
+            // Apply 30 min break
+            await api.patch(`/housekeeping/cleaning-sessions/${session.id}/`, {
+                break_minutes: 30
+            });
+            setSession(prev => ({ ...prev, breakMinutes: 30 }));
+            showToast("Break recorded (30 mins deducted)", 'SUCCESS');
+        } catch (e) {
+            console.error("Take break failed", e);
+            showToast("Failed to record break", 'ERROR');
         }
     };
 
@@ -1424,7 +1454,8 @@ export const HotelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             fetchAnalytics, submitInspection,
             isOffline, isQueueProcessing, queue,
             roomDrafts, startCleaning, stopCleaning, saveDraft,
-            isLoading
+            isLoading,
+            takeBreak
         }}>
             {children}
         </HotelContext.Provider>

@@ -570,6 +570,7 @@ export default function RoomListScreen() {
                 <SupervisorTeamDashboard />
             ) : (
                 <>
+
                     <DayTimer totalMinutes={totalMinutes} />
 
                     {/* Team Header */}

@@ -151,6 +151,8 @@ class CleaningSession(models.Model):
     target_duration_minutes = models.IntegerField(default=0)
     end_time = models.DateTimeField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='IN_PROGRESS')
+    break_minutes = models.IntegerField(default=0) # Tracks taken break duration
+
     
     def __str__(self):
         return f"Session {self.group_id} - {self.status}"

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import Svg, { Circle, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useHotel } from '../contexts/HotelContext';
 import { theme } from '../utils/theme';
@@ -12,41 +12,26 @@ interface DayTimerProps {
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
-    const { session } = useHotel();
+    const { session, takeBreak } = useHotel();
     const [elapsed, setElapsed] = useState(0);
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     // Derived logic
-    const totalSeconds = totalMinutes * 60;
-    const remaining = totalSeconds - elapsed;
-    const isOvertime = remaining < 0; // Check strict logic vs equality
+    const totalSeconds = totalMinutes * 60; // Target (if any)
+
+    // Net Elapsed (Subtract break if taken)
+    const breakSeconds = (session.breakMinutes || 0) * 60;
+    const netElapsed = Math.max(0, elapsed - breakSeconds);
+
+    // Break Eligibility: > 6 hours (21600 seconds)
+    const canTakeBreak = elapsed > 21600 && !session.breakMinutes;
 
     // Animation for Overtime (Pulse)
     // Dependent strictly on isOvertime boolean state transition
-    useEffect(() => {
-        if (!session.isActive || !isOvertime) {
-            pulseAnim.stopAnimation();
-            pulseAnim.setValue(1);
-            return;
-        }
+    // (Keeping overtime logic if target exists, but prioritization Count Up)
+    // Actually, user wants "Total Hours".
 
-        const anim = Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 800,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        anim.start();
-        return () => anim.stop();
-    }, [isOvertime, session.isActive]); // Stable dependencies
+    // ... useEffects for animation (simplified or removed if generic count up) ...
 
     // Timer Interval Logic
     useEffect(() => {
@@ -58,7 +43,6 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
         const calculateElapsed = () => {
             const start = new Date(session.startTime!).getTime();
             const now = new Date().getTime();
-            // Prevent negative elapsed if system clock drifts weirdly (though unlikely with Date.now)
             return Math.max(0, Math.floor((now - start) / 1000));
         };
 
@@ -71,9 +55,9 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
         return () => clearInterval(interval);
     }, [session.isActive, session.startTime]);
 
-    if (!session.isActive) return null;
+    // Removed: if (!session.isActive) return null;
+    // We want to show 00:00:00 if not active.
 
-    const absSeconds = Math.abs(remaining);
 
     // Formatting
     const formatTime = (seconds: number) => {
@@ -83,34 +67,28 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Circular Progress settings
-    const size = 200; // Increased from 160 for better visibility
+    // Circular Progress: Now represents 8 hour work day? Or just generic spinner?
+    // Let's assume a standard 8 hour day (28800s) for the visual progress if target is 0.
+    const targetSeconds = totalMinutes > 0 ? totalSeconds : 28800;
+
+    // ... (Visual props) ...
+    const size = 200;
     const strokeWidth = 12;
     const center = size / 2;
     const radius = size / 2 - strokeWidth / 2;
     const circumference = 2 * Math.PI * radius;
-
-    // Progress (0 to 1) - Clamp
-    const progress = Math.min(Math.max(elapsed / (totalSeconds || 1), 0), 1);
-
-    // Fill up visual
+    const progress = Math.min(Math.max(netElapsed / targetSeconds, 0), 1);
     const fillOffset = circumference - (circumference * progress);
-
-    const getStrokeColor = () => {
-        if (isOvertime) return theme.colors.error;
-        if (progress > 0.8) return theme.colors.warning;
-        return theme.colors.primary;
-    };
 
     return (
         <View style={styles.container}>
             <View style={styles.card}>
                 <View style={styles.headerRow}>
-                    <Text style={styles.title}>Session Timer</Text>
-                    {isOvertime && (
-                        <View style={styles.overtimeBadge}>
-                            <AlertTriangle size={14} color="white" />
-                            <Text style={styles.overtimeText}>OVERTIME</Text>
+                    <Text style={styles.title}>Daily Timer</Text>
+                    {/* Break Indicator */}
+                    {session.breakMinutes > 0 && (
+                        <View style={styles.breakBadge}>
+                            <Text style={styles.breakText}>Break Taken (-30m)</Text>
                         </View>
                     )}
                 </View>
@@ -133,44 +111,41 @@ export const DayTimer = React.memo(({ totalMinutes }: DayTimerProps) => {
                             strokeOpacity={0.5}
                         />
                         {/* Progress Circle */}
-                        {!isOvertime && (
-                            <G rotation="-90" origin={`${center}, ${center}`}>
-                                <AnimatedCircle
-                                    stroke={progress > 0.8 ? theme.colors.warning : "url(#progressGradient)"}
-                                    cx={center}
-                                    cy={center}
-                                    r={radius}
-                                    strokeWidth={strokeWidth}
-                                    strokeDasharray={circumference}
-                                    strokeDashoffset={fillOffset}
-                                    strokeLinecap="round"
-                                />
-                            </G>
-                        )}
-                        {/* Overtime Ring (Static Red) */}
-                        {isOvertime && (
-                            <Circle
-                                stroke={theme.colors.error}
+                        <G rotation="-90" origin={`${center}, ${center}`}>
+                            <AnimatedCircle
+                                stroke={"url(#progressGradient)"}
                                 cx={center}
                                 cy={center}
                                 r={radius}
                                 strokeWidth={strokeWidth}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={fillOffset}
+                                strokeLinecap="round"
                             />
-                        )}
+                        </G>
                     </Svg>
 
                     {/* Center Text */}
                     <View style={styles.centerTextContainer}>
-                        <Animated.View style={{ transform: [{ scale: isOvertime ? pulseAnim : 1 }] }}>
-                            <Text style={[styles.timerValue, { color: isOvertime ? theme.colors.error : theme.colors.primary }]}>
-                                {isOvertime ? '+' : ''}{formatTime(absSeconds)}
-                            </Text>
-                            <Text style={styles.subLabel}>
-                                {isOvertime ? 'Over limit' : 'Remaining'}
-                            </Text>
-                        </Animated.View>
+                        <Text style={[styles.timerValue, { color: theme.colors.primary }]}>
+                            {formatTime(netElapsed)}
+                        </Text>
+                        <Text style={styles.subLabel}>
+                            Total Worked
+                        </Text>
                     </View>
                 </View>
+
+                {/* Break Button logic */}
+                {canTakeBreak && (
+                    <TouchableOpacity
+                        style={styles.breakButton}
+                        onPress={takeBreak}
+                    >
+                        <Text style={styles.breakButtonText}>Add 30m Break</Text>
+                    </TouchableOpacity>
+                )}
+
 
                 {/* Footer Info */}
                 <View style={styles.footer}>
@@ -278,5 +253,33 @@ const styles = StyleSheet.create({
         width: 1,
         height: 24,
         backgroundColor: '#f0f0f0',
+    },
+    breakBadge: {
+        backgroundColor: '#EFF6FF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+    },
+    breakText: {
+        color: theme.colors.primary,
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    breakButton: {
+        marginTop: 20,
+        backgroundColor: theme.colors.primary,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...theme.shadows.card,
+    },
+    breakButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 14,
     }
 });

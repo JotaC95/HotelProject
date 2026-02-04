@@ -9,211 +9,184 @@ class Command(BaseCommand):
         # Data provided by user
         data = {
           "date": "2026-02-04",
-          "team": "Team 2 (20-43)",
+          "team": "Team 1 (1-19)",
           "rooms": [
             {
-              "room": "23",
-              "room_type": "2 Bedroom",
-              "reservation_number": "6003448",
-              "status_in_out": None,
+              "room": "01",
+              "room_type": "1 Bedroom",
+              "reservation_number": "6170317",
+              "status_in_out": "Out",
               "people": "1A",
-              "departure_date": "2026-02-08",
-              "task": "Weekly Extra Service - Wednesday",
+              "departure_date": "2026-02-04",
+              "task": "Departure",
               "task_status": "Pending",
-              "bed_config_note_number": "23",
-              "notes": "Lock second room"
+              "notes": "Lock second bedroom, 1 x queen"
             },
             {
-              "room": "24",
+              "room": "03",
               "room_type": "2 Bedroom",
-              "reservation_number": "6163719",
+              "reservation_number": "6167337",
+              "status_in_out": "Out",
+              "people": "2A",
+              "departure_date": "2026-02-04",
+              "task": "Departure",
+              "task_status": "Pending",
+              "notes": "Lock second bedroom, 1 x king"
+            },
+            {
+              "room": "03",
+              "room_type": "2 Bedroom",
+              "reservation_number": "6172191",
+              "status_in_out": "In",
+              "people": "1A",
+              "departure_date": "2026-02-25",
+              "task": "Pre Arrival Check",
+              "task_status": "Pending",
+              "notes": "Unlock both bedrooms, 2 x kings, Early Arrival (In/Out)"
+            },
+            {
+              "room": "07",
+              "room_type": "1 Bedroom",
+              "reservation_number": "6099321",
               "status_in_out": None,
               "people": "1A",
-              "departure_date": "2026-02-07",
+              "departure_date": "2026-02-06",
+              "task": "Rubbish Removal",
+              "task_status": "Pending",
+              "notes": "Lock second bedroom, 1 x queen"
+            },
+            {
+              "room": "11",
+              "room_type": "1 Bedroom",
+              "reservation_number": "6118587",
+              "status_in_out": "Out",
+              "people": "1A",
+              "departure_date": "2026-02-04",
+              "task": "Departure",
+              "task_status": "Pending",
+              "notes": "Lock second bedroom, 1 x queen"
+            },
+            {
+              "room": "11",
+              "room_type": "1 Bedroom",
+              "reservation_number": "6124593",
+              "status_in_out": "In",
+              "people": "1A",
+              "departure_date": "2026-02-05",
+              "task": "Pre Arrival Check",
+              "task_status": "Pending",
+              "notes": "Lock second room, 1 x queen, Action Res Notes (In/Out)"
+            },
+            {
+              "room": "12",
+              "room_type": "3 Bedroom",
+              "reservation_number": "6130172",
+              "status_in_out": "Out",
+              "people": "1A",
+              "departure_date": "2026-02-04",
+              "task": "Departure",
+              "task_status": "Pending",
+              "notes": "Lock second and third bedroom"
+            },
+            {
+              "room": "12",
+              "room_type": "3 Bedroom",
+              "reservation_number": "6094445",
+              "status_in_out": "In",
+              "people": "1A",
+              "departure_date": "2026-02-05",
+              "task": "Pre Arrival Check",
+              "task_status": "Pending",
+              "notes": "Lock second and third room, ETA 5:30–6pm"
+            },
+            {
+              "room": "15",
+              "room_type": "1 Bedroom",
+              "reservation_number": "5968731",
+              "status_in_out": None,
+              "people": "1A",
+              "departure_date": "2026-02-06",
+              "task": "Rubbish Removal",
+              "task_status": "Pending",
+              "notes": "Lock the second bedroom, 1 x queen"
+            },
+            {
+              "room": "17",
+              "room_type": "1 Bedroom",
+              "reservation_number": "6132327",
+              "status_in_out": None,
+              "people": "1A",
+              "departure_date": "2026-04-18",
               "task": "Weekly Service - Wednesday",
               "task_status": "Pending",
-              "bed_config_note_number": "24",
-              "notes": "Lock the second bedroom, 1 x king"
+              "notes": "Lock second room, Take payment every Wednesday (Inhouse)"
             },
             {
-              "room": "29",
+              "room": "18",
               "room_type": "2 Bedroom",
-              "reservation_number": "6132072",
-              "status_in_out": None,
-              "people": "1A",
-              "departure_date": "2026-02-06",
-              "task": "Rubbish Removal",
-              "task_status": "Pending",
-              "bed_config_note_number": "29",
-              "notes": "Lock second room, 1 x king"
-            },
-            {
-              "room": "33",
-              "room_type": "1 Bedroom",
-              "reservation_number": "6173723",
-              "status_in_out": "Out",
-              "people": "2A",
-              "departure_date": "2026-02-04",
-              "task": "Departure",
-              "task_status": "Pending",
-              "bed_config_note_number": "33",
-              "notes": "Lock second room"
-            },
-            {
-              "room": "33",
-              "room_type": "1 Bedroom",
-              "reservation_number": "6094341",
-              "status_in_out": "In",
-              "people": "1A",
-              "departure_date": "2026-02-05",
-              "task": "Pre Arrival Check",
-              "task_status": "Pending",
-              "bed_config_note_number": None,
-              "notes": "1 Queen bed"
-            },
-            {
-              "room": "34B",
-              "room_type": "1 Bedroom",
-              "reservation_number": "6145324",
+              "reservation_number": "6118607",
               "status_in_out": "Out",
               "people": "1A",
               "departure_date": "2026-02-04",
               "task": "Departure",
               "task_status": "Pending",
-              "bed_config_note_number": "34B",
-              "notes": "Lock second room"
+              "notes": "Lock second bedroom, 1 x queen"
             },
             {
-              "room": "34B",
-              "room_type": "1 Bedroom",
-              "reservation_number": "6094379",
-              "status_in_out": "In",
-              "people": "1A",
-              "departure_date": "2026-02-05",
-              "task": "Pre Arrival Check",
-              "task_status": "Pending",
-              "bed_config_note_number": None,
-              "notes": "Lock second bedroom"
-            },
-            {
-              "room": "44",
+              "room": "18",
               "room_type": "2 Bedroom",
-              "reservation_number": "6135578",
-              "status_in_out": None,
-              "people": "1A",
-              "departure_date": "2026-02-06",
-              "task": "Rubbish Removal",
-              "task_status": "Pending",
-              "bed_config_note_number": "44",
-              "notes": "Lock the second bedroom, 1 x king"
-            },
-            {
-              "room": "45",
-              "room_type": "2 Bedroom",
-              "reservation_number": "6128196",
-              "status_in_out": "Out",
-              "people": "1A",
-              "departure_date": "2026-02-04",
-              "task": "Departure",
-              "task_status": "Pending",
-              "bed_config_note_number": "45",
-              "notes": "Lock second bedroom, 1 x king"
-            },
-            {
-              "room": "45",
-              "room_type": "2 Bedroom",
-              "reservation_number": "6126950",
+              "reservation_number": "6124729",
               "status_in_out": "In",
-              "people": "1A",
-              "departure_date": "2026-02-06",
-              "task": "Pre Arrival Check",
-              "task_status": "Pending",
-              "bed_config_note_number": None,
-              "notes": "Lock second bedroom"
-            },
-            {
-              "room": "50",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "5895403",
-              "status_in_out": None,
-              "people": "2A",
-              "departure_date": "2026-02-07",
-              "task": "Weekly Service - Friday",
-              "task_status": "Pending",
-              "bed_config_note_number": "50",
-              "notes": "Lock second room"
-            },
-            {
-              "room": "51",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "6094726",
-              "status_in_out": "Out",
-              "people": "1A",
-              "departure_date": "2026-02-04",
-              "task": "Departure",
-              "task_status": "Pending",
-              "bed_config_note_number": "51",
-              "notes": "Lock second bedroom, 1 x king"
-            },
-            {
-              "room": "51",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "6128008",
-              "status_in_out": "In",
-              "people": "1A",
-              "departure_date": "2026-02-06",
-              "task": "Pre Arrival Check",
-              "task_status": "Pending",
-              "bed_config_note_number": None,
-              "notes": "Lock second bedroom, 1 x king"
-            },
-            {
-              "room": "56",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "5921631",
-              "status_in_out": None,
-              "people": "1A",
-              "departure_date": "2026-02-24",
-              "task": "Weekly Extra Service - Wednesday",
-              "task_status": "Pending",
-              "bed_config_note_number": "56",
-              "notes": "Lock second bedroom, 1 x king"
-            },
-            {
-              "room": "57",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "6013849",
-              "status_in_out": None,
-              "people": "1A",
-              "departure_date": "2026-02-10",
-              "task": "Rubbish Removal",
-              "task_status": "Pending",
-              "bed_config_note_number": "57",
-              "notes": "Early arrival requested – 1pm"
-            },
-            {
-              "room": "60",
-              "room_type": "1 Bedroom Executive",
-              "reservation_number": "6070847",
-              "status_in_out": None,
-              "people": "1A",
-              "departure_date": "2026-02-07",
-              "task": "Rubbish Removal",
-              "task_status": "Pending",
-              "bed_config_note_number": "60",
-              "notes": "Lock the second bedroom, 1 x king"
-            }
-          ]
-        }
+      "people": "1A",
+      "departure_date": "2026-02-05",
+      "task": "Pre Arrival Check",
+      "task_status": "Pending",
+      "notes": "Lock second room"
+    },
+    {
+      "room": "19",
+      "room_type": "3 Bedroom",
+      "reservation_number": "6106433",
+      "status_in_out": "In",
+      "people": "1A",
+      "departure_date": "2026-02-05",
+      "task": "Pre Arrival Check",
+      "task_status": "Pending",
+      "notes": "Lock second and third room"
+    },
+    {
+      "room": "20",
+      "room_type": "2 Bedroom",
+      "reservation_number": "6172872",
+      "status_in_out": "Out",
+      "people": "1A",
+      "departure_date": "2026-02-04",
+      "task": "Departure",
+      "task_status": "Pending",
+      "notes": "Unlock second room, 1 king, 2 singles"
+    },
+    {
+      "room": "20",
+      "room_type": "2 Bedroom",
+      "reservation_number": "6106264",
+      "status_in_out": "In",
+      "people": "1A",
+      "departure_date": "2026-02-05",
+      "task": "Pre Arrival Check",
+      "task_status": "Pending",
+      "notes": "Lock the second bedroom, 1 x king"
+    }
+  ],
+  "extra_handwritten_notes": [
+    "IQ 11-106 Prearrival – lock 2nd bed",
+    "Departure x19 – lock 2nd"
+  ]
+}
 
         self.stdout.write(f"Importing data for {data['team']} - {data['date']}")
         
         # Determine group name
-        # "Team 2 (20-43)" -> "Group 2"? Or just use the whole string. 
-        # The prompt says "Team 2", likely "Group 2" in the app context if we want to assign it.
-        # But '20-43' implies it might be levels 20-43.
-        # Let's map "Team X" to "Group X" for simpler UI filtering if possible.
-        group_name = "Group 2" 
+        group_name = "Group 1" 
 
         rooms_list = data.get('rooms', [])
         for room_data in rooms_list:
